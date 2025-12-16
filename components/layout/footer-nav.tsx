@@ -18,7 +18,10 @@ export function FooterNav() {
   const isClockedIn = useAppStore((state) => state.isClockedIn)
   const clockIn = useAppStore((state) => state.clockIn)
   const clockOut = useAppStore((state) => state.clockOut)
-  const showConfirm = useAppStore((state) => state.showConfirm)
+  const stopTimer = useAppStore((state) => state.stopTimer)
+  const showStopTimerPromptFor = useAppStore((state) => state.showStopTimerPromptFor)
+  const activeTimer = useAppStore((state) => state.activeTimer)
+  const ticketsByTeam = useAppStore((state) => state.ticketsByTeam)
   const syncStatus = useAppStore((state) => state.syncStatus)
   const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
   const { isRunning, elapsedMs } = useTimer()
@@ -27,14 +30,16 @@ export function FooterNav() {
 
   const handleClockToggle = () => {
     if (isClockedIn) {
-      if (isRunning) {
-        showConfirm(
-          "Clock Out?",
-          "You have an active timer running. Clocking out will stop the timer. Continue?",
-          () => {
-            clockOut()
-          },
-        )
+      if (isRunning && activeTimer) {
+        // Find the ticket title for the active timer
+        const ticket = ticketsByTeam[activeTimer.teamId]?.find((t) => t.id === activeTimer.ticketId)
+        const ticketTitle = ticket?.title || "Unknown ticket"
+        
+        // Show stop timer prompt, then clock out after stopping
+        showStopTimerPromptFor(activeTimer.ticketId, ticketTitle, (note: string) => {
+          stopTimer(note)
+          clockOut()
+        })
       } else {
         clockOut()
       }
