@@ -51,7 +51,7 @@ export function FooterNav() {
   if (!currentTeamId) return null
 
   return (
-    <nav className="app-footer-nav fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur md:hidden supports-[backdrop-filter]:bg-card/80">
+    <nav className="app-footer-nav fixed bottom-0 left-0 right-0 z-40 border-t border-border bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       <div className="nav-container mx-auto flex h-16 max-w-4xl items-center justify-around px-2">
         {/* Left nav items */}
         {navItems.map((item) => {
