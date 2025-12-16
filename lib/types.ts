@@ -82,7 +82,7 @@ export type SyncStatus = "idle" | "syncing" | "error" | "offline"
 export interface SyncQueueItem {
   id: string
   type: "create" | "update" | "delete"
-  entity: "timeEntry" | "ticket" | "assignment"
+  entity: "timeEntry" | "ticket" | "assignment" | "activityLog"
   payload: unknown
   createdAt: string
   retryCount: number
@@ -93,10 +93,13 @@ export type ActivityLogEntryType = "clock-in" | "clock-out" | "timer-start" | "t
 
 export interface ActivityLogEntry {
   id: string
+  userId: string
+  teamId?: string // Optional for clock-in/clock-out which may not have a team context
   type: ActivityLogEntryType
   timestamp: string // ISO timestamp
   ticketId?: string
   ticketTitle?: string
   durationMs?: number // For clock-out and timer-stop entries
   note?: string
+  pendingSync?: boolean // True if not yet synced to server
 }

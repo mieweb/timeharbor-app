@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { Check, Users } from "lucide-react"
+import { Check, Users, Clock } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -15,8 +15,17 @@ export function TeamSwitcherModal() {
   const setCurrentTeam = useAppStore((state) => state.setCurrentTeam)
   const memberships = useAppStore((state) => state.memberships)
   const user = useAppStore((state) => state.user)
+  const isClockedIn = useAppStore((state) => state.isClockedIn)
+  const clockedInTeamId = useAppStore((state) => state.clockedInTeamId)
+  const addToast = useAppStore((state) => state.addToast)
+
+  const clockedInTeam = teams.find((t) => t.id === clockedInTeamId)
 
   const handleSelectTeam = (teamId: string) => {
+    // If switching away from the team where user is clocked in, show a warning
+    if (isClockedIn && clockedInTeamId && teamId !== clockedInTeamId) {
+      addToast(`You're still clocked in to ${clockedInTeam?.name || "another team"}`, "warning")
+    }
     setCurrentTeam(teamId)
     setShowTeamSwitcher(false)
     router.push(`/team/${teamId}/dashboard`)
@@ -40,9 +49,20 @@ export function TeamSwitcherModal() {
           </DialogDescription>
         </DialogHeader>
 
+        {/* Clocked-in warning */}
+        {isClockedIn && clockedInTeamId && (
+          <div className="flex items-center gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm">
+            <Clock className="h-4 w-4 text-warning shrink-0" />
+            <span className="text-warning">
+              You're clocked in to <strong>{clockedInTeam?.name}</strong>
+            </span>
+          </div>
+        )}
+
         <div className="team-switcher-list mt-4 space-y-2">
           {teams.map((team) => {
             const isSelected = team.id === currentTeamId
+            const isClockedInToThisTeam = clockedInTeamId === team.id
             const role = getRoleForTeam(team.id)
 
             return (
@@ -57,7 +77,15 @@ export function TeamSwitcherModal() {
                 )}
               >
                 <div className="team-switcher-item-content flex flex-col gap-1">
-                  <span className="team-switcher-item-name font-medium text-foreground">{team.name}</span>
+                  <span className="team-switcher-item-name font-medium text-foreground flex items-center gap-2">
+                    {team.name}
+                    {isClockedInToThisTeam && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
+                        <Clock className="h-2.5 w-2.5" />
+                        Clocked In
+                      </span>
+                    )}
+                  </span>
                   {team.description && (
                     <span className="team-switcher-item-description text-sm text-muted-foreground">
                       {team.description}

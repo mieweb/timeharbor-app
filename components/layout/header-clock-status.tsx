@@ -17,17 +17,21 @@ export function HeaderClockStatus() {
   const setShowTeamSwitcher = useAppStore((state) => state.setShowTeamSwitcher)
   const showConfirm = useAppStore((state) => state.showConfirm)
   const syncStatus = useAppStore((state) => state.syncStatus)
-  const syncQueue = useAppStore((state) => state.syncQueue)
+  const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
   const isClockedIn = useAppStore((state) => state.isClockedIn)
+  const clockedInTeamId = useAppStore((state) => state.clockedInTeamId)
   const showStopTimerPromptFor = useAppStore((state) => state.showStopTimerPromptFor)
   const stopTimer = useAppStore((state) => state.stopTimer)
 
-  const { activeTimer, elapsedMs, isRunning } = useTimer()
+  const { activeTimer, elapsedMs, isRunning, isRunningForCurrentTeam } = useTimer()
   const clockedInElapsedMs = useClockedInTimer()
   const todayTotalMs = useTodayTotal()
 
   const currentTeam = getCurrentTeam()
   const hasMultipleTeams = teams.length > 1
+  
+  // User appears as "clocked in" only when viewing the team they're clocked into
+  const isClockedInToCurrentTeam = isClockedIn && clockedInTeamId === currentTeamId
 
   // Get active ticket name
   const activeTicket = activeTimer
@@ -36,19 +40,9 @@ export function HeaderClockStatus() {
 
   const handleTeamClick = () => {
     if (!hasMultipleTeams) return
-
-    if (isRunning) {
-      showConfirm(
-        "Stop Timer?",
-        "You have an active timer. Switching teams will stop the current timer. Continue?",
-        () => {
-          stopTimer()
-          setShowTeamSwitcher(true)
-        },
-      )
-    } else {
-      setShowTeamSwitcher(true)
-    }
+    // Just open team switcher - the modal shows a warning if user is clocked in
+    // Timer continues running for the original team when switching views
+    setShowTeamSwitcher(true)
   }
 
   const handleStopTimer = () => {
@@ -96,7 +90,7 @@ export function HeaderClockStatus() {
               "header-sync-indicator flex items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors",
               syncStatus !== "syncing" && syncStatus !== "offline" && "hover:bg-secondary cursor-pointer",
             )}
-            title={syncQueue.length > 0 ? `${syncQueue.length} pending changes` : "Synced"}
+            title={getPendingChangesCount() > 0 ? `${getPendingChangesCount()} pending changes` : "Synced"}
           >
             <SyncIcon
               className={cn(
@@ -107,15 +101,15 @@ export function HeaderClockStatus() {
                 syncStatus === "offline" && "text-warning",
               )}
             />
-            {syncQueue.length > 0 && (
+            {getPendingChangesCount() > 0 && (
               <span className="header-sync-badge rounded-full bg-primary/10 px-1.5 text-[10px] font-medium text-primary">
-                {syncQueue.length}
+                {getPendingChangesCount()}
               </span>
             )}
           </button>
 
           {/* Timer status */}
-          {isRunning ? (
+          {isRunningForCurrentTeam ? (
             <>
               <div className="timer-display flex flex-col items-end">
                 <div className="timer-duration flex items-center gap-1.5">
@@ -147,7 +141,7 @@ export function HeaderClockStatus() {
             <div className="timer-idle-status flex items-center gap-2 text-muted-foreground">
               <Clock className="h-4 w-4" />
               <div className="timer-status-text flex flex-col items-end">
-                {isClockedIn ? (
+                {isClockedInToCurrentTeam ? (
                   <>
                     <span className="timer-session-time text-sm font-mono text-foreground">
                       {formatDuration(clockedInElapsedMs)}

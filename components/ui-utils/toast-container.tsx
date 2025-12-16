@@ -1,6 +1,6 @@
 "use client"
 
-import { CheckCircle, XCircle, Info, X } from "lucide-react"
+import { CheckCircle, XCircle, Info, AlertTriangle, X } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
@@ -8,6 +8,7 @@ const toastConfig = {
   success: { icon: CheckCircle, className: "bg-success text-success-foreground" },
   error: { icon: XCircle, className: "bg-destructive text-destructive-foreground" },
   info: { icon: Info, className: "bg-primary text-primary-foreground" },
+  warning: { icon: AlertTriangle, className: "bg-warning text-warning-foreground" },
 }
 
 export function ToastContainer() {

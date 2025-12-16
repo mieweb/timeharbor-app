@@ -1,9 +1,10 @@
 "use client"
 
-import { Clock, LogIn, LogOut, Play, Square, MessageSquare, StickyNote } from "lucide-react"
+import { Clock, LogIn, LogOut, Play, Square, MessageSquare, StickyNote, Cloud } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { formatDuration } from "@/hooks/use-timer"
 import { useTodayTotal } from "@/hooks/use-today-total"
+import { cn } from "@/lib/utils"
 import type { ActivityLogEntry } from "@/lib/types"
 
 function formatTime(isoString: string): string {
@@ -38,7 +39,10 @@ function ActivityLogItem({ entry }: { entry: ActivityLogEntry }) {
   const Icon = iconMap[entry.type]
 
   return (
-    <div className="activity-log-item flex flex-col gap-1 py-2 border-b border-border last:border-0">
+    <div className={cn(
+      "activity-log-item flex flex-col gap-1 py-2 border-b border-border last:border-0",
+      entry.pendingSync && "pl-2 border-l-2 border-l-warning bg-warning/5"
+    )}>
       <div className="activity-log-item-header flex items-center gap-3">
         <div className={`activity-log-icon flex-shrink-0 ${colorMap[entry.type]}`}>
           <Icon className="h-4 w-4" />
@@ -46,6 +50,12 @@ function ActivityLogItem({ entry }: { entry: ActivityLogEntry }) {
         <div className="activity-log-content flex-1 min-w-0">
           <div className="activity-log-label flex items-center gap-2">
             <span className="activity-log-type text-sm font-medium text-foreground">{labelMap[entry.type]}</span>
+            {entry.pendingSync && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                <Cloud className="h-2.5 w-2.5" />
+                Local
+              </span>
+            )}
             {entry.ticketTitle && (
               <span className="activity-log-ticket text-sm text-muted-foreground truncate">- {entry.ticketTitle}</span>
             )}
@@ -71,17 +81,23 @@ function ActivityLogItem({ entry }: { entry: ActivityLogEntry }) {
   )
 }
 
-export function ActivityLog() {
+export function ActivityLog({ teamId }: { teamId?: string }) {
   const activityLog = useAppStore((state) => state.activityLog)
-  const todayTotalMs = useTodayTotal()
+  const currentTeamId = useAppStore((state) => state.currentTeamId)
+  const todayTotalMs = useTodayTotal(teamId)
 
-  // Filter to today's activities only
+  const filterTeamId = teamId ?? currentTeamId
+
+  // Filter to today's activities only, scoped to the current team
   const today = new Date()
   today.setHours(0, 0, 0, 0)
   const todayMs = today.getTime()
 
   const todayActivities = activityLog.filter((entry) => {
-    return new Date(entry.timestamp).getTime() >= todayMs
+    const isToday = new Date(entry.timestamp).getTime() >= todayMs
+    // Only show entries for this team
+    const isTeamMatch = filterTeamId ? entry.teamId === filterTeamId : true
+    return isToday && isTeamMatch
   })
 
   const sortedActivities = [...todayActivities].sort((a, b) => {

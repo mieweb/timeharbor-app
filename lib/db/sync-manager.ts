@@ -1,18 +1,12 @@
-// Background sync manager for offline-first functionality
+// Simplified sync manager - manual sync only, IndexedDB is source of truth
 
 import { db } from "./indexed-db"
 import { getDataService } from "@/lib/services/data-service"
 import { useAppStore } from "@/lib/store"
-import type { SyncQueueItem, TimeEntry, Ticket } from "@/lib/types"
 
-const SYNC_INTERVAL = 30000 // 30 seconds
-const MAX_RETRIES = 5
-const RETRY_BACKOFF_BASE = 1000 // 1 second
-
-let syncInterval: NodeJS.Timeout | null = null
 let isOnline = typeof navigator !== "undefined" ? navigator.onLine : true
 
-// Initialize sync manager
+// Initialize sync manager - just track online/offline status
 export function initSyncManager() {
   if (typeof window === "undefined") return
 
@@ -23,333 +17,121 @@ export function initSyncManager() {
   // Set initial status
   updateSyncStatus(navigator.onLine ? "idle" : "offline")
 
-  // Start periodic sync if online
-  if (navigator.onLine) {
-    startPeriodicSync()
-  }
-
   return () => {
     window.removeEventListener("online", handleOnline)
     window.removeEventListener("offline", handleOffline)
-    stopPeriodicSync()
   }
 }
 
 function handleOnline() {
   isOnline = true
   updateSyncStatus("idle")
-  // Trigger immediate sync when coming back online
-  triggerSync()
-  startPeriodicSync()
+  // Note: No auto-sync, user must click "Sync Now"
 }
 
 function handleOffline() {
   isOnline = false
   updateSyncStatus("offline")
-  stopPeriodicSync()
-}
-
-function startPeriodicSync() {
-  if (syncInterval) return
-  syncInterval = setInterval(triggerSync, SYNC_INTERVAL)
-}
-
-function stopPeriodicSync() {
-  if (syncInterval) {
-    clearInterval(syncInterval)
-    syncInterval = null
-  }
 }
 
 function updateSyncStatus(status: "idle" | "syncing" | "error" | "offline") {
   useAppStore.getState().setSyncStatus(status)
 }
 
-// Main sync function
+// Manual sync function - called only when user clicks "Sync Now"
 export async function triggerSync() {
   if (!isOnline) {
     updateSyncStatus("offline")
     return
   }
 
-  const queue = await db.syncQueue.getAll()
-  console.log('[Sync] triggerSync called', { queueLength: queue.length })
-  
-  if (queue.length === 0) {
-    // Even if queue is empty, pull latest data
-    console.log('[Sync] Queue empty, pulling from server...')
-    await pullFromServer()
-    return
-  }
-
   updateSyncStatus("syncing")
-  console.log('[Sync] Processing queue items:', queue.length)
+  console.log("[Sync] Manual sync triggered")
 
   try {
-    // Process queue items one by one
-    for (const item of queue) {
-      await processQueueItem(item)
+    const store = useAppStore.getState()
+    const dataService = getDataService()
+    const userId = store.user?.id
+    const currentTeamId = store.currentTeamId
+
+    if (!userId || !currentTeamId) {
+      console.log("[Sync] No user or team, skipping")
+      updateSyncStatus("idle")
+      return
     }
 
-    // After pushing, pull latest from server
-    await pullFromServer()
+    // 1. Push local activity log entries that are pending
+    const localActivityLog = store.activityLog.filter(e => e.pendingSync)
+    if (localActivityLog.length > 0) {
+      console.log("[Sync] Pushing", localActivityLog.length, "activity entries")
+      for (const entry of localActivityLog) {
+        await dataService.activityLog.create({
+          id: entry.id,
+          userId: entry.userId,
+          teamId: entry.teamId,
+          type: entry.type,
+          timestamp: entry.timestamp,
+          ticketId: entry.ticketId,
+          ticketTitle: entry.ticketTitle,
+          durationMs: entry.durationMs,
+          note: entry.note,
+          pendingSync: false,
+        })
+      }
+      
+      // Mark as synced locally
+      const syncedLog = store.activityLog.map(e => 
+        e.pendingSync ? { ...e, pendingSync: false } : e
+      )
+      store.setActivityLog(syncedLog)
+      await db.activityLog.putMany(syncedLog)
+    }
 
+    // 2. Pull fresh tickets from server
+    console.log("[Sync] Pulling tickets for team", currentTeamId)
+    const serverTickets = await dataService.tickets.list(currentTeamId)
+    
+    // Merge with local tickets (preserve local notes)
+    const localTickets = store.ticketsByTeam[currentTeamId] || []
+    const mergedTickets = serverTickets.map(serverTicket => {
+      const localTicket = localTickets.find(t => t.id === serverTicket.id)
+      if (localTicket?.notes && localTicket.notes.length > 0) {
+        return { ...serverTicket, notes: localTicket.notes }
+      }
+      return serverTicket
+    })
+    
+    store.setTickets(currentTeamId, mergedTickets)
+    await db.tickets.putMany(mergedTickets)
+
+    // 3. Pull time entries
+    const timeEntries = await dataService.time.list(userId, currentTeamId)
+    store.setTimeEntries(timeEntries)
+    await db.timeEntries.putMany(timeEntries)
+
+    // 4. Pull assignments
+    const assignments = await dataService.assignments.list(currentTeamId)
+    store.setAssignments(currentTeamId, assignments)
+    await db.assignments.putMany(assignments)
+
+    // 5. Pull members
+    const members = await dataService.members.list(currentTeamId)
+    store.setMembers(currentTeamId, members)
+
+    // Done
     updateSyncStatus("idle")
-    console.log('[Sync] Sync completed successfully')
-    useAppStore.getState().setLastSyncedAt(new Date().toISOString())
+    store.setLastSyncedAt(new Date().toISOString())
     await db.metadata.set("lastSyncedAt", new Date().toISOString())
+    console.log("[Sync] Sync completed successfully")
+    
   } catch (error) {
     console.error("[Sync] Sync failed:", error)
     updateSyncStatus("error")
   }
 }
 
-async function processQueueItem(item: SyncQueueItem) {
-  const dataService = getDataService()
-
-  try {
-    switch (item.entity) {
-      case "timeEntry":
-        await processTimeEntrySync(item, dataService)
-        break
-      case "ticket":
-        await processTicketSync(item, dataService)
-        break
-      case "assignment":
-        await processAssignmentSync(item, dataService)
-        break
-    }
-
-    // Remove from queue on success
-    await db.syncQueue.remove(item.id)
-    useAppStore.getState().removeFromSyncQueue(item.id)
-  } catch (error) {
-    // Increment retry count
-    if (item.retryCount >= MAX_RETRIES) {
-      // Max retries reached, remove from queue and log error
-      console.error(`Sync item ${item.id} failed after ${MAX_RETRIES} retries:`, error)
-      await db.syncQueue.remove(item.id)
-      useAppStore.getState().removeFromSyncQueue(item.id)
-    } else {
-      // Update retry count with exponential backoff
-      const updatedItem: SyncQueueItem = {
-        ...item,
-        retryCount: item.retryCount + 1,
-      }
-      await db.syncQueue.put(updatedItem)
-
-      // Wait before next retry
-      const backoffMs = RETRY_BACKOFF_BASE * Math.pow(2, item.retryCount)
-      await new Promise((resolve) => setTimeout(resolve, backoffMs))
-    }
-  }
-}
-
-async function processTimeEntrySync(item: SyncQueueItem, dataService: ReturnType<typeof getDataService>) {
-  const payload = item.payload as TimeEntry
-
-  switch (item.type) {
-    case "create":
-      const created = await dataService.time.create({
-        userId: payload.userId,
-        teamId: payload.teamId,
-        ticketId: payload.ticketId,
-        start: payload.start,
-        end: payload.end,
-        durationMs: payload.durationMs,
-        source: "local",
-        pendingSync: false,
-      })
-      // Update local with server ID if different
-      if (created.id !== payload.id) {
-        await db.timeEntries.remove(payload.id)
-        await db.timeEntries.put({ ...created, pendingSync: false })
-      } else {
-        await db.timeEntries.put({ ...payload, pendingSync: false })
-      }
-      break
-
-    case "update":
-      await dataService.time.update(payload.id, {
-        end: payload.end,
-        durationMs: payload.durationMs,
-      })
-      await db.timeEntries.put({ ...payload, pendingSync: false })
-      break
-  }
-}
-
-async function processTicketSync(item: SyncQueueItem, dataService: ReturnType<typeof getDataService>) {
-  const payload = item.payload as Ticket
-
-  switch (item.type) {
-    case "create":
-      const created = await dataService.tickets.create(payload.teamId, {
-        title: payload.title,
-        description: payload.description,
-        status: payload.status,
-        createdBy: payload.createdBy,
-      })
-      // Update local with server data
-      if (created.id !== payload.id) {
-        await db.tickets.remove(payload.id)
-      }
-      await db.tickets.put(created)
-      break
-
-    case "update":
-      await dataService.tickets.update(payload.id, {
-        title: payload.title,
-        description: payload.description,
-        status: payload.status,
-      })
-      break
-
-    case "delete":
-      await dataService.tickets.delete(payload.id)
-      await db.tickets.remove(payload.id)
-      break
-  }
-}
-
-async function processAssignmentSync(item: SyncQueueItem, dataService: ReturnType<typeof getDataService>) {
-  const payload = item.payload as {
-    id: string
-    teamId: string
-    ticketId: string
-    assigneeUserId: string
-    assignedBy: string
-  }
-
-  switch (item.type) {
-    case "create":
-      await dataService.assignments.create({
-        teamId: payload.teamId,
-        ticketId: payload.ticketId,
-        assigneeUserId: payload.assigneeUserId,
-        assignedBy: payload.assignedBy,
-      })
-      break
-
-    case "delete":
-      await dataService.assignments.delete(payload.id)
-      break
-  }
-}
-
-// Pull latest data from server
-async function pullFromServer() {
-  if (!isOnline) return
-
-  const store = useAppStore.getState()
-  const currentTeamId = store.currentTeamId
-  const userId = store.user?.id
-
-  if (!currentTeamId || !userId) return
-
-  console.log('[Sync] pullFromServer starting...', { currentTeamId, userId })
-
-  const dataService = getDataService()
-  const lastSyncedAt = await db.metadata.get("lastSyncedAt")
-
-  try {
-    // Pull tickets for current team
-    const serverTickets = await dataService.tickets.list(currentTeamId)
-    const localTickets = store.ticketsByTeam[currentTeamId] || []
-    
-    console.log('[Sync] Merging tickets:', {
-      serverCount: serverTickets.length,
-      localCount: localTickets.length,
-      localNoteCounts: localTickets.map(t => ({ id: t.id, title: t.title, notes: t.notes?.length || 0 }))
-    })
-    
-    // Merge server tickets with local data (preserve notes and other local-only fields)
-    const mergedTickets = serverTickets.map(serverTicket => {
-      const localTicket = localTickets.find(t => t.id === serverTicket.id)
-      if (localTicket) {
-        // Preserve local notes and other local-only data
-        const merged = {
-          ...serverTicket,
-          notes: localTicket.notes || [],
-          // Preserve local order if it exists
-        }
-        if (localTicket.notes?.length) {
-          console.log('[Sync] Preserving notes for ticket:', { 
-            ticketId: serverTicket.id, 
-            noteCount: localTicket.notes.length 
-          })
-        }
-        return merged
-      }
-      return serverTicket
-    })
-    
-    // Also include any local-only tickets (not yet synced to server)
-    const serverTicketIds = new Set(serverTickets.map(t => t.id))
-    const localOnlyTickets = localTickets.filter(t => !serverTicketIds.has(t.id))
-    if (localOnlyTickets.length > 0) {
-      console.log('[Sync] Preserving local-only tickets:', localOnlyTickets.map(t => t.id))
-    }
-    
-    const finalTickets = [...mergedTickets, ...localOnlyTickets]
-    
-    console.log('[Sync] Final merged tickets:', {
-      count: finalTickets.length,
-      noteCounts: finalTickets.map(t => ({ id: t.id, notes: t.notes?.length || 0 }))
-    })
-    
-    await db.tickets.putMany(finalTickets)
-    store.setTickets(currentTeamId, finalTickets)
-
-    // Pull time entries for user
-    const timeEntries = await dataService.time.listForUser(userId, lastSyncedAt || undefined)
-
-    // Merge with local entries (prefer server for non-pending items)
-    const localEntries = await db.timeEntries.getByUser(userId)
-    const pendingIds = new Set(localEntries.filter((e) => e.pendingSync).map((e) => e.id))
-
-    const mergedEntries = [
-      ...timeEntries.filter((e) => !pendingIds.has(e.id)),
-      ...localEntries.filter((e) => e.pendingSync),
-    ]
-
-    await db.timeEntries.putMany(mergedEntries)
-    store.setTimeEntries(mergedEntries)
-
-    // Pull assignments
-    const assignments = await dataService.assignments.list(currentTeamId)
-    await db.assignments.putMany(assignments)
-    store.setAssignments(currentTeamId, assignments)
-
-    // Pull members
-    const members = await dataService.members.list(currentTeamId)
-    store.setMembers(currentTeamId, members)
-  } catch (error) {
-    console.error("Failed to pull from server:", error)
-  }
-}
-
-// Add item to sync queue (called from store actions)
-export async function queueForSync(
-  type: "create" | "update" | "delete",
-  entity: "timeEntry" | "ticket" | "assignment",
-  payload: unknown,
-) {
-  const item: SyncQueueItem = {
-    id: `sync-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    type,
-    entity,
-    payload,
-    createdAt: new Date().toISOString(),
-    retryCount: 0,
-  }
-
-  await db.syncQueue.put(item)
-  useAppStore.getState().addToSyncQueue(item)
-
-  // Trigger sync if online
-  if (isOnline) {
-    // Debounce sync to batch multiple changes
-    setTimeout(triggerSync, 1000)
-  }
+// Legacy export for compatibility - no longer does anything
+// Data is persisted directly to IndexedDB by store actions
+export async function queueForSync() {
+  // No-op: sync only happens when user clicks "Sync Now"
 }

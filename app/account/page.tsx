@@ -1,11 +1,13 @@
 "use client"
 
-import { LogOut, Trash2, Cloud, CloudOff, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
+import { LogOut, Trash2, Cloud, CloudOff, RefreshCw, AlertCircle, CheckCircle2, Clock, Play, Square, StickyNote, LogIn } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAppStore } from "@/lib/store"
 import { triggerSync } from "@/lib/db/sync-manager"
 import { cn } from "@/lib/utils"
+import type { ActivityLogEntry } from "@/lib/types"
 
 export default function AccountPage() {
   const user = useAppStore((state) => state.user)
@@ -14,9 +16,39 @@ export default function AccountPage() {
   const showConfirm = useAppStore((state) => state.showConfirm)
   const syncStatus = useAppStore((state) => state.syncStatus)
   const lastSyncedAt = useAppStore((state) => state.lastSyncedAt)
-  const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
+  const activityLog = useAppStore((state) => state.activityLog)
   
-  const pendingCount = getPendingChangesCount()
+  // Show all pending across all teams in account page
+  const pendingEntries = activityLog.filter(e => e.pendingSync)
+  const pendingCount = pendingEntries.length
+
+  const getActivityIcon = (type: ActivityLogEntry["type"]) => {
+    switch (type) {
+      case "clock-in":
+        return <LogIn className="h-4 w-4 text-green-500" />
+      case "clock-out":
+        return <Clock className="h-4 w-4 text-orange-500" />
+      case "timer-start":
+        return <Play className="h-4 w-4 text-primary" />
+      case "timer-stop":
+        return <Square className="h-4 w-4 text-muted-foreground" />
+      case "note-added":
+        return <StickyNote className="h-4 w-4 text-yellow-500" />
+      default:
+        return <Clock className="h-4 w-4" />
+    }
+  }
+
+  const formatActivityType = (type: ActivityLogEntry["type"]) => {
+    switch (type) {
+      case "clock-in": return "Clocked In"
+      case "clock-out": return "Clocked Out"
+      case "timer-start": return "Started Timer"
+      case "timer-stop": return "Stopped Timer"
+      case "note-added": return "Added Note"
+      default: return type
+    }
+  }
 
   const initials =
     user?.name
@@ -182,7 +214,7 @@ export default function AccountPage() {
                 You have <span className="font-medium text-foreground">{pendingCount} local {pendingCount === 1 ? "change" : "changes"}</span> that 
                 {syncStatus === "offline" 
                   ? " will be synced when you're back online."
-                  : " will be synced shortly."}
+                  : " you can sync by clicking the button below."}
               </p>
             </div>
           )}
@@ -197,6 +229,64 @@ export default function AccountPage() {
             <RefreshCw className={cn("h-4 w-4", syncStatus === "syncing" && "animate-spin")} />
             {syncStatus === "syncing" ? "Syncing..." : "Sync Now"}
           </Button>
+        </div>
+      </div>
+
+      {/* Pending Activity (Local Changes) */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Pending Activity</h2>
+        <div className="rounded-xl border border-border bg-card">
+          {pendingEntries.length === 0 ? (
+            <div className="p-6 text-center text-muted-foreground">
+              <CheckCircle2 className="h-8 w-8 mx-auto mb-2 opacity-50 text-green-500" />
+              <p>All activity synced</p>
+            </div>
+          ) : (
+            <ScrollArea className="h-75">
+              <div className="p-4 space-y-2">
+                {/* Pending Activity Entries grouped by team */}
+                {pendingEntries
+                  .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+                  .map((entry) => {
+                    const team = teams.find(t => t.id === entry.teamId)
+                    return (
+                      <div
+                        key={entry.id}
+                        className="flex items-start gap-3 rounded-lg border border-border/50 bg-muted/30 p-3"
+                      >
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-background">
+                          {getActivityIcon(entry.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm text-foreground">
+                              {formatActivityType(entry.type)}
+                            </span>
+                            {entry.pendingSync && (
+                              <span className="inline-flex items-center rounded-full bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning">
+                                Local
+                              </span>
+                            )}
+                          </div>
+                          {team && (
+                            <p className="text-xs text-primary font-medium">{team.name}</p>
+                          )}
+                          {entry.ticketTitle && (
+                            <p className="text-sm text-muted-foreground truncate">{entry.ticketTitle}</p>
+                          )}
+                          {entry.note && (
+                            <p className="text-sm text-muted-foreground truncate">{entry.note}</p>
+                          )}
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(entry.timestamp).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    )
+                  })}
+              </div>
+            </ScrollArea>
+          )}
         </div>
       </div>
 

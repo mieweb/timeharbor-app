@@ -27,12 +27,14 @@ export function usePersistence() {
         await initDB()
 
         // Load cached data from IndexedDB
-        const [cachedTeams, cachedMemberships, cachedTimeEntries, cachedActivityLog, lastSynced] = await Promise.all([
+        const [cachedTeams, cachedMemberships, cachedTimeEntries, cachedActivityLog, lastSynced, clockedInState, activeTimerState] = await Promise.all([
           db.teams.getAll(),
           db.memberships.getAll(),
           db.timeEntries.getAll(),
           db.activityLog.getAll(),
-          db.metadata.get("lastSyncedAt"),
+          db.metadata.get<string>("lastSyncedAt"),
+          db.metadata.get<{ isClockedIn: boolean; clockedInAt: string | null; clockedInTeamId: string | null }>("clockedInState"),
+          db.metadata.get<{ teamId: string; ticketId: string; timeEntryId: string; startedAt: string } | null>("activeTimer"),
         ])
 
         // Restore teams
@@ -47,6 +49,31 @@ export function usePersistence() {
 
         if (cachedActivityLog.length > 0) {
           useAppStore.setState({ activityLog: cachedActivityLog })
+        }
+
+        // Restore clocked in state
+        if (clockedInState) {
+          useAppStore.setState({ 
+            isClockedIn: clockedInState.isClockedIn,
+            clockedInAt: clockedInState.clockedInAt,
+            clockedInTeamId: clockedInState.clockedInTeamId ?? null,
+          })
+        }
+
+        // Restore active timer state
+        if (activeTimerState) {
+          // Recalculate localClockStart based on time elapsed since startedAt
+          const startedAtMs = new Date(activeTimerState.startedAt).getTime()
+          const elapsedSinceStart = Date.now() - startedAtMs
+          useAppStore.setState({
+            activeTimer: {
+              teamId: activeTimerState.teamId,
+              ticketId: activeTimerState.ticketId,
+              timeEntryId: activeTimerState.timeEntryId,
+              startedAt: activeTimerState.startedAt,
+              localClockStart: Date.now() - elapsedSinceStart,
+            },
+          })
         }
 
         // Restore last synced timestamp
@@ -114,6 +141,36 @@ export function usePersistence() {
       db.tickets.putMany(allTickets).catch(console.error)
     }
   }, [ticketsByTeam])
+
+  // Persist clocked in state when it changes (skip initial mount before persistence loads)
+  const isClockedIn = useAppStore((state) => state.isClockedIn)
+  const clockedInAt = useAppStore((state) => state.clockedInAt)
+  const clockedInTeamId = useAppStore((state) => state.clockedInTeamId)
+  const persistenceLoaded = useAppStore((state) => state.persistenceLoaded)
+  useEffect(() => {
+    // Don't persist until we've loaded existing data
+    if (!persistenceLoaded) return
+    db.metadata.set("clockedInState", { isClockedIn, clockedInAt, clockedInTeamId }).catch(console.error)
+  }, [isClockedIn, clockedInAt, clockedInTeamId, persistenceLoaded])
+
+  // Persist active timer state when it changes (skip initial mount before persistence loads)
+  const activeTimer = useAppStore((state) => state.activeTimer)
+  useEffect(() => {
+    // Don't persist until we've loaded existing data
+    if (!persistenceLoaded) return
+    if (activeTimer) {
+      // Only persist the parts we need (exclude localClockStart which is recalculated on restore)
+      db.metadata.set("activeTimer", {
+        teamId: activeTimer.teamId,
+        ticketId: activeTimer.ticketId,
+        timeEntryId: activeTimer.timeEntryId,
+        startedAt: activeTimer.startedAt,
+      }).catch(console.error)
+    } else {
+      // Clear the active timer from storage
+      db.metadata.set("activeTimer", null).catch(console.error)
+    }
+  }, [activeTimer, persistenceLoaded])
 
   const activityLog = useAppStore((state) => state.activityLog)
   useEffect(() => {

@@ -37,6 +37,7 @@ export function TicketCard({ ticket, todayMs = 0, reorderable = false, index = 0
   const updateTicket = useAppStore((state) => state.updateTicket)
   const reorderTicket = useAppStore((state) => state.reorderTicket)
   const isClockedIn = useAppStore((state) => state.isClockedIn)
+  const clockedInTeamId = useAppStore((state) => state.clockedInTeamId)
   const showClockInPromptFor = useAppStore((state) => state.showClockInPromptFor)
   const showStopTimerPromptFor = useAppStore((state) => state.showStopTimerPromptFor)
   const stopTimer = useAppStore((state) => state.stopTimer)
@@ -47,6 +48,8 @@ export function TicketCard({ ticket, todayMs = 0, reorderable = false, index = 0
   const isFirst = index === 0
   const isLast = index === totalCount - 1
   const notesCount = ticket.notes?.length || 0
+  // Check if clocked into THIS ticket's team
+  const isClockedInToTicketTeam = isClockedIn && clockedInTeamId === ticket.teamId
 
   const handleStopTimer = () => {
     showStopTimerPromptFor(ticket.id, ticket.title, (note: string) => {
@@ -57,7 +60,8 @@ export function TicketCard({ ticket, todayMs = 0, reorderable = false, index = 0
   const handleToggleTimer = () => {
     if (isActiveTicket) {
       handleStopTimer()
-    } else if (!isClockedIn) {
+    } else if (!isClockedInToTicketTeam) {
+      // Not clocked into this ticket's team - show clock-in prompt
       showClockInPromptFor(ticket.teamId, ticket.id)
     } else if (isTimerRunning) {
       showConfirm(

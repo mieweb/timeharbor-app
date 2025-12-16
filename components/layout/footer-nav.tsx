@@ -16,6 +16,7 @@ export function FooterNav() {
   const pathname = usePathname()
   const currentTeamId = useAppStore((state) => state.currentTeamId)
   const isClockedIn = useAppStore((state) => state.isClockedIn)
+  const clockedInTeamId = useAppStore((state) => state.clockedInTeamId)
   const clockIn = useAppStore((state) => state.clockIn)
   const clockOut = useAppStore((state) => state.clockOut)
   const stopTimer = useAppStore((state) => state.stopTimer)
@@ -24,12 +25,15 @@ export function FooterNav() {
   const ticketsByTeam = useAppStore((state) => state.ticketsByTeam)
   const syncStatus = useAppStore((state) => state.syncStatus)
   const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
-  const { isRunning, elapsedMs } = useTimer()
+  const { isRunning, isRunningForCurrentTeam, elapsedMs } = useTimer()
   
   const pendingCount = getPendingChangesCount()
+  
+  // User appears as "clocked in" only when viewing the team they're clocked into
+  const isClockedInToCurrentTeam = isClockedIn && clockedInTeamId === currentTeamId
 
   const handleClockToggle = () => {
-    if (isClockedIn) {
+    if (isClockedInToCurrentTeam) {
       if (isRunning && activeTimer) {
         // Find the ticket title for the active timer
         const ticket = ticketsByTeam[activeTimer.teamId]?.find((t) => t.id === activeTimer.ticketId)
@@ -38,13 +42,13 @@ export function FooterNav() {
         // Show stop timer prompt, then clock out after stopping
         showStopTimerPromptFor(activeTimer.ticketId, ticketTitle, (note: string) => {
           stopTimer(note)
-          clockOut()
+          clockOut(currentTeamId || undefined)
         })
       } else {
-        clockOut()
+        clockOut(currentTeamId || undefined)
       }
     } else {
-      clockIn()
+      clockIn(currentTeamId || undefined)
     }
   }
 
@@ -79,19 +83,19 @@ export function FooterNav() {
           onClick={handleClockToggle}
           className={cn(
             "nav-clock-button relative -mt-6 flex h-16 w-16 flex-col items-center justify-center rounded-full shadow-lg transition-all active:scale-95",
-            isClockedIn ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground",
+            isClockedInToCurrentTeam ? "bg-destructive text-destructive-foreground" : "bg-primary text-primary-foreground",
           )}
         >
-          {isClockedIn ? (
+          {isClockedInToCurrentTeam ? (
             <>
-              {isRunning && (
+              {isRunningForCurrentTeam && (
                 <span className="nav-clock-pulse absolute -top-1 -right-1 flex h-3 w-3">
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive-foreground opacity-75" />
                   <span className="relative inline-flex h-3 w-3 rounded-full bg-destructive-foreground" />
                 </span>
               )}
               <LogOut className="h-6 w-6" />
-              {isRunning ? (
+              {isRunningForCurrentTeam ? (
                 <span className="nav-clock-time text-[10px] font-mono font-semibold">{formatDuration(elapsedMs)}</span>
               ) : (
                 <span className="nav-clock-label text-[10px] font-medium">Out</span>

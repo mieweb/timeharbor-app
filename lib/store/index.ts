@@ -53,15 +53,17 @@ interface TicketsSlice {
 interface TimerSlice {
   isClockedIn: boolean
   clockedInAt: string | null
+  clockedInTeamId: string | null
   activeTimer: ActiveTimer | null
   timeEntries: TimeEntry[]
   activityLog: ActivityLogEntry[]
-  clockIn: () => void
+  clockIn: (teamId?: string) => void
   clockInAndStartTimer: (teamId: string, ticketId: string, ticketTitle: string) => string
-  clockOut: () => void
+  clockOut: (teamId?: string) => void
   startTimer: (teamId: string, ticketId: string, ticketTitle: string) => string // returns timeEntryId
   stopTimer: (note?: string) => TimeEntry | null
   setTimeEntries: (entries: TimeEntry[]) => void
+  setActivityLog: (entries: ActivityLogEntry[]) => void
   addTimeEntry: (entry: TimeEntry) => void
   getElapsedMs: () => number
   getTodayTotalMs: () => number
@@ -82,7 +84,7 @@ interface SyncSlice {
   incrementPendingChanges: () => void
   decrementPendingChanges: () => void
   setPendingChangesCount: (count: number) => void
-  getPendingChangesCount: () => number
+  getPendingChangesCount: (teamId?: string) => number
 }
 
 // UI slice
@@ -110,7 +112,7 @@ interface UISlice {
     open: boolean
     ticketId: string | null
   }
-  toasts: Array<{ id: string; message: string; type: "success" | "error" | "info" }>
+  toasts: Array<{ id: string; message: string; type: "success" | "error" | "info" | "warning" }>
   setShowTeamSwitcher: (show: boolean) => void
   setShowAddTicketModal: (show: boolean) => void
   showClockInPromptFor: (teamId: string, ticketId: string) => void
@@ -121,7 +123,7 @@ interface UISlice {
   hideStopTimerPrompt: () => void
   showTicketNotes: (ticketId: string) => void
   hideTicketNotes: () => void
-  addToast: (message: string, type: "success" | "error" | "info") => void
+  addToast: (message: string, type: "success" | "error" | "info" | "warning") => void
   removeToast: (id: string) => void
 }
 
@@ -252,11 +254,16 @@ export const useAppStore = create<AppStore>()(
 
         const activityEntry: ActivityLogEntry = {
           id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          userId: state.user?.id || "",
+          teamId: Object.keys(state.ticketsByTeam).find(teamId => 
+            state.ticketsByTeam[teamId]?.some(t => t.id === ticketId)
+          ),
           type: "note-added",
           timestamp: new Date().toISOString(),
           ticketId,
           ticketTitle,
           note: content,
+          pendingSync: true,
         }
 
         const newTicketsByTeam = { ...state.ticketsByTeam }
@@ -271,12 +278,8 @@ export const useAppStore = create<AppStore>()(
           })
         }
 
-        // Queue the ticket update for sync
-        if (updatedTicket) {
-          import("@/lib/db/sync-manager").then(({ queueForSync }) => {
-            queueForSync("update", "ticket", updatedTicket)
-          })
-        }
+        // Data is persisted to IndexedDB via persistence middleware
+        // Sync happens when user clicks "Sync Now"
 
         return {
           ticketsByTeam: newTicketsByTeam,
@@ -288,42 +291,165 @@ export const useAppStore = create<AppStore>()(
     // Timer slice
     isClockedIn: false,
     clockedInAt: null,
+    clockedInTeamId: null,
     activeTimer: null,
     timeEntries: [],
     activityLog: [],
-    clockIn: () => {
+    clockIn: (teamId) => {
       const now = new Date().toISOString()
-      const entry: ActivityLogEntry = {
-        id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      const userId = get().user?.id || ""
+      const resolvedTeamId = teamId || get().currentTeamId
+      const { isClockedIn, clockedInTeamId, activeTimer, clockedInAt } = get()
+      
+      const newEntries: ActivityLogEntry[] = []
+      
+      // If already clocked in to a different team, auto clock out first
+      if (isClockedIn && clockedInTeamId && clockedInTeamId !== resolvedTeamId) {
+        // Stop any active timer first
+        if (activeTimer) {
+          const durationMs = activeTimer.startedAt 
+            ? Date.now() - new Date(activeTimer.startedAt).getTime() 
+            : 0
+          
+          // Create timer stop entry for the old team
+          const timerStopEntry: ActivityLogEntry = {
+            id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            userId,
+            teamId: activeTimer.teamId,
+            type: "timer-stop",
+            timestamp: now,
+            ticketId: activeTimer.ticketId,
+            durationMs,
+            pendingSync: true,
+          }
+          newEntries.push(timerStopEntry)
+          
+          // Update the time entry
+          set((state) => ({
+            timeEntries: state.timeEntries.map((te) =>
+              te.id === activeTimer.timeEntryId
+                ? { ...te, end: now, updatedAt: now, pendingSync: true }
+                : te
+            ),
+            activeTimer: null,
+          }))
+        }
+        
+        // Create clock-out entry for the old team
+        const oldDurationMs = clockedInAt ? Date.now() - new Date(clockedInAt).getTime() : 0
+        const clockOutEntry: ActivityLogEntry = {
+          id: `activity-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
+          userId,
+          teamId: clockedInTeamId,
+          type: "clock-out",
+          timestamp: now,
+          durationMs: oldDurationMs,
+          pendingSync: true,
+        }
+        newEntries.push(clockOutEntry)
+        
+        get().addToast(`Auto clocked out of previous team`, "info")
+      }
+      
+      // Create clock-in entry for the new team
+      const clockInEntry: ActivityLogEntry = {
+        id: `activity-${Date.now() + 2}-${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        teamId: resolvedTeamId || undefined,
         type: "clock-in",
         timestamp: now,
+        pendingSync: true,
       }
+      newEntries.push(clockInEntry)
+      
       set((state) => ({
         isClockedIn: true,
         clockedInAt: now,
-        activityLog: [entry, ...state.activityLog],
+        clockedInTeamId: resolvedTeamId,
+        activityLog: [...newEntries.reverse(), ...state.activityLog],
       }))
       get().addToast("Clocked in successfully", "success")
+      // Data is persisted to IndexedDB, sync on manual button click
     },
     clockInAndStartTimer: (teamId, ticketId, ticketTitle) => {
       const now = new Date().toISOString()
       const timeEntryId = `time-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      const userId = get().user?.id || ""
+      const { isClockedIn, clockedInTeamId, activeTimer, clockedInAt } = get()
       
-      // Clock in entry
+      const newEntries: ActivityLogEntry[] = []
+      
+      // If already clocked in to a different team, auto clock out first
+      if (isClockedIn && clockedInTeamId && clockedInTeamId !== teamId) {
+        // Stop any active timer first
+        if (activeTimer) {
+          const durationMs = activeTimer.startedAt 
+            ? Date.now() - new Date(activeTimer.startedAt).getTime() 
+            : 0
+          
+          // Create timer stop entry for the old team
+          const timerStopEntry: ActivityLogEntry = {
+            id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            userId,
+            teamId: activeTimer.teamId,
+            type: "timer-stop",
+            timestamp: now,
+            ticketId: activeTimer.ticketId,
+            durationMs,
+            pendingSync: true,
+          }
+          newEntries.push(timerStopEntry)
+          
+          // Update the time entry
+          set((state) => ({
+            timeEntries: state.timeEntries.map((te) =>
+              te.id === activeTimer.timeEntryId
+                ? { ...te, end: now, updatedAt: now, pendingSync: true }
+                : te
+            ),
+            activeTimer: null,
+          }))
+        }
+        
+        // Create clock-out entry for the old team
+        const oldDurationMs = clockedInAt ? Date.now() - new Date(clockedInAt).getTime() : 0
+        const clockOutEntry: ActivityLogEntry = {
+          id: `activity-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
+          userId,
+          teamId: clockedInTeamId,
+          type: "clock-out",
+          timestamp: now,
+          durationMs: oldDurationMs,
+          pendingSync: true,
+        }
+        newEntries.push(clockOutEntry)
+        
+        get().addToast(`Auto clocked out of previous team`, "info")
+      }
+      
+      // Clock in entry for the new team
       const clockInEntry: ActivityLogEntry = {
-        id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        id: `activity-${Date.now() + 2}-${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        teamId,
         type: "clock-in",
         timestamp: now,
+        pendingSync: true,
       }
+      newEntries.push(clockInEntry)
       
       // Timer start entry
       const timerStartEntry: ActivityLogEntry = {
-        id: `activity-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
+        id: `activity-${Date.now() + 3}-${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        teamId,
         type: "timer-start",
         timestamp: now,
         ticketId,
         ticketTitle,
+        pendingSync: true,
       }
+      newEntries.push(timerStartEntry)
       
       const timeEntry: TimeEntry = {
         id: timeEntryId,
@@ -340,6 +466,7 @@ export const useAppStore = create<AppStore>()(
       set((state) => ({
         isClockedIn: true,
         clockedInAt: now,
+        clockedInTeamId: teamId,
         activeTimer: {
           teamId,
           ticketId,
@@ -348,41 +475,44 @@ export const useAppStore = create<AppStore>()(
           localClockStart: Date.now(),
         },
         timeEntries: [...state.timeEntries, timeEntry],
-        activityLog: [timerStartEntry, clockInEntry, ...state.activityLog],
+        activityLog: [...newEntries.reverse(), ...state.activityLog],
       }))
       
       get().addToast("Clocked in successfully", "success")
-      
-      import("@/lib/db/sync-manager").then(({ queueForSync }) => {
-        queueForSync("create", "timeEntry", timeEntry)
-      })
+      // Data is persisted to IndexedDB, sync on manual button click
       
       return timeEntryId
     },
-    clockOut: () => {
-      const { activeTimer, stopTimer, clockedInAt } = get()
+    clockOut: (teamId) => {
+      const { activeTimer, stopTimer, clockedInAt, user, currentTeamId } = get()
       if (activeTimer) {
         stopTimer()
       }
       const now = new Date().toISOString()
       const durationMs = clockedInAt ? Date.now() - new Date(clockedInAt).getTime() : 0
+      const resolvedTeamId = teamId || currentTeamId
       const entry: ActivityLogEntry = {
         id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        userId: user?.id || "",
+        teamId: resolvedTeamId || undefined,
         type: "clock-out",
         timestamp: now,
         durationMs,
+        pendingSync: true,
       }
       // Also clear any pending clock-in prompts
       set((state) => ({
         isClockedIn: false,
         clockedInAt: null,
+        clockedInTeamId: null,
         activityLog: [entry, ...state.activityLog],
         showClockInPrompt: { open: false, pendingTicketId: null, pendingTeamId: null },
       }))
       get().addToast("Clocked out", "info")
+      // Data is persisted to IndexedDB, sync on manual button click
     },
     startTimer: (teamId, ticketId, ticketTitle) => {
-      const { isClockedIn } = get()
+      const { isClockedIn, user } = get()
       if (!isClockedIn) {
         console.log("[v0] Cannot start timer: not clocked in")
         return ""
@@ -390,6 +520,7 @@ export const useAppStore = create<AppStore>()(
 
       const timeEntryId = `time-${Date.now()}-${Math.random().toString(36).slice(2)}`
       const now = new Date().toISOString()
+      const userId = user?.id || ""
       set({
         activeTimer: {
           teamId,
@@ -401,7 +532,7 @@ export const useAppStore = create<AppStore>()(
       })
       const entry: TimeEntry = {
         id: timeEntryId,
-        userId: get().user?.id || "",
+        userId,
         teamId,
         ticketId,
         start: now,
@@ -411,19 +542,19 @@ export const useAppStore = create<AppStore>()(
       }
       const activityEntry: ActivityLogEntry = {
         id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        teamId,
         type: "timer-start",
         timestamp: now,
         ticketId,
         ticketTitle,
+        pendingSync: true,
       }
       set((state) => ({
         timeEntries: [...state.timeEntries, entry],
         activityLog: [activityEntry, ...state.activityLog],
       }))
-
-      import("@/lib/db/sync-manager").then(({ queueForSync }) => {
-        queueForSync("create", "timeEntry", entry)
-      })
+      // Data is persisted to IndexedDB, sync on manual button click
 
       return timeEntryId
     },
@@ -436,18 +567,22 @@ export const useAppStore = create<AppStore>()(
       const now = new Date().toISOString()
       const startTime = new Date(activeTimer.startedAt).getTime()
       const durationMs = Date.now() - startTime
+      const userId = user?.id || ""
 
       const updatedEntry = timeEntries.find((e) => e.id === activeTimer.timeEntryId)
       const ticket = ticketsByTeam[activeTimer.teamId]?.find((t) => t.id === activeTimer.ticketId)
 
       const activityEntry: ActivityLogEntry = {
         id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        userId,
+        teamId: activeTimer.teamId,
         type: "timer-stop",
         timestamp: now,
         ticketId: activeTimer.ticketId,
         ticketTitle: ticket?.title || "Unknown ticket",
         durationMs,
         note,
+        pendingSync: true,
       }
 
       // If there's a note, also add it to the ticket's notes array
@@ -458,7 +593,7 @@ export const useAppStore = create<AppStore>()(
           id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           content: note.trim(),
           createdAt: now,
-          createdBy: user?.id || "",
+          createdBy: userId,
         }
         newTicketsByTeam = { ...ticketsByTeam }
         for (const teamId in newTicketsByTeam) {
@@ -487,13 +622,7 @@ export const useAppStore = create<AppStore>()(
           ticketsByTeam: newTicketsByTeam,
         }))
 
-        import("@/lib/db/sync-manager").then(({ queueForSync }) => {
-          queueForSync("update", "timeEntry", finalEntry)
-          // Also sync the ticket if notes were added
-          if (updatedTicket) {
-            queueForSync("update", "ticket", updatedTicket)
-          }
-        })
+        // Data is persisted to IndexedDB, sync on manual button click
 
         return finalEntry
       }
@@ -503,9 +632,12 @@ export const useAppStore = create<AppStore>()(
         activityLog: [activityEntry, ...state.activityLog],
         ticketsByTeam: newTicketsByTeam,
       }))
+      // Data is persisted to IndexedDB, sync on manual button click
+      
       return null
     },
     setTimeEntries: (entries) => set({ timeEntries: entries }),
+    setActivityLog: (entries) => set({ activityLog: entries }),
     addTimeEntry: (entry) => set((state) => ({ timeEntries: [...state.timeEntries, entry] })),
     getElapsedMs: () => {
       const { activeTimer } = get()
@@ -547,18 +679,15 @@ export const useAppStore = create<AppStore>()(
     incrementPendingChanges: () => set((state) => ({ pendingChangesCount: state.pendingChangesCount + 1 })),
     decrementPendingChanges: () => set((state) => ({ pendingChangesCount: Math.max(0, state.pendingChangesCount - 1) })),
     setPendingChangesCount: (count) => set({ pendingChangesCount: count }),
-    getPendingChangesCount: () => {
-      const { syncQueue, ticketsByTeam } = get()
-      // Count sync queue items + tickets with local notes
-      let localNotesCount = 0
-      for (const teamId in ticketsByTeam) {
-        for (const ticket of ticketsByTeam[teamId]) {
-          if (ticket.notes && ticket.notes.length > 0) {
-            localNotesCount += ticket.notes.length
-          }
-        }
-      }
-      return syncQueue.length + localNotesCount
+    getPendingChangesCount: (teamId?: string) => {
+      const { activityLog, currentTeamId } = get()
+      const filterTeamId = teamId ?? currentTeamId
+      // Count only pending (not synced) activity log entries for the current team
+      return activityLog.filter(e => {
+        if (!e.pendingSync) return false
+        // Only count entries for this team
+        return filterTeamId ? e.teamId === filterTeamId : true
+      }).length
     },
     addToSyncQueue: (item) =>
       set((state) => ({
@@ -622,7 +751,7 @@ export const useAppStore = create<AppStore>()(
         showTicketNotesModal: { open: false, ticketId: null },
       }),
     addToast: (message, type) => {
-      const id = `toast-${Date.now()}`
+      const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
       set((state) => ({ toasts: [...state.toasts, { id, message, type }] }))
       setTimeout(() => {
         set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) }))

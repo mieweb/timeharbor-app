@@ -1,6 +1,6 @@
 // Abstract DataService interface for pluggable backends (Meteor.js / Supabase)
 
-import type { User, Team, Membership, Ticket, TimeEntry, Assignment } from "@/lib/types"
+import type { User, Team, Membership, Ticket, TimeEntry, Assignment, ActivityLogEntry } from "@/lib/types"
 
 export interface AuthService {
   getSession(): Promise<{ user: User; memberships: Membership[] } | null>
@@ -38,6 +38,12 @@ export interface AssignmentsService {
   delete(id: string): Promise<void>
 }
 
+export interface ActivityLogService {
+  list(userId: string, since?: string): Promise<ActivityLogEntry[]>
+  create(entry: Omit<ActivityLogEntry, "id"> & { id?: string }): Promise<ActivityLogEntry>
+  createMany(entries: Omit<ActivityLogEntry, "id">[]): Promise<ActivityLogEntry[]>
+}
+
 export interface DataService {
   auth: AuthService
   teams: TeamsService
@@ -45,6 +51,7 @@ export interface DataService {
   time: TimeService
   members: MembersService
   assignments: AssignmentsService
+  activityLog: ActivityLogService
 }
 
 // Factory function to get the data service based on environment
@@ -118,6 +125,7 @@ const mockTickets: Ticket[] = [
 ]
 
 const mockTimeEntries: TimeEntry[] = []
+const mockActivityLog: ActivityLogEntry[] = []
 const mockAssignments: Assignment[] = [
   {
     id: "assign-1",
@@ -253,6 +261,45 @@ function getMockDataService(): DataService {
         if (index >= 0) {
           mockAssignments.splice(index, 1)
         }
+      },
+    },
+    activityLog: {
+      async list(userId: string, since?: string) {
+        let entries = mockActivityLog.filter((e) => e.userId === userId)
+        if (since) {
+          entries = entries.filter((e) => new Date(e.timestamp) > new Date(since))
+        }
+        return entries.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      },
+      async create(entry) {
+        const logEntry: ActivityLogEntry = {
+          ...entry,
+          // Preserve ID if provided, otherwise generate new one
+          id: entry.id || `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }
+        // Check if entry with this ID already exists (prevent duplicates)
+        const existingIndex = mockActivityLog.findIndex((e) => e.id === logEntry.id)
+        if (existingIndex >= 0) {
+          mockActivityLog[existingIndex] = logEntry
+        } else {
+          mockActivityLog.push(logEntry)
+        }
+        return logEntry
+      },
+      async createMany(entries) {
+        const createdEntries = entries.map((entry) => ({
+          ...entry,
+          id: entry.id || `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        }))
+        createdEntries.forEach((logEntry) => {
+          const existingIndex = mockActivityLog.findIndex((e) => e.id === logEntry.id)
+          if (existingIndex >= 0) {
+            mockActivityLog[existingIndex] = logEntry
+          } else {
+            mockActivityLog.push(logEntry)
+          }
+        })
+        return createdEntries
       },
     },
   }

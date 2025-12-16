@@ -275,13 +275,13 @@ export const db = {
     clear: () => clear(STORES.syncQueue),
   },
 
-  // Metadata
+  // Metadata - supports any JSON-serializable value
   metadata: {
-    get: async (key: string): Promise<string | null> => {
-      const result = await get<{ key: string; value: string }>(STORES.metadata, key)
-      return result?.value || null
+    get: async <T = string>(key: string): Promise<T | null> => {
+      const result = await get<{ key: string; value: T }>(STORES.metadata, key)
+      return result?.value ?? null
     },
-    set: (key: string, value: string) => put(STORES.metadata, { key, value }),
+    set: <T>(key: string, value: T) => put(STORES.metadata, { key, value }),
   },
 
   // ActivityLog

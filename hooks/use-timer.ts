@@ -61,10 +61,16 @@ export function useTimer() {
     return stopTimer()
   }, [stopTimer])
 
+  // Timer is running globally
+  const isRunning = !!activeTimer
+  // Timer is running AND it's for the current team
+  const isRunningForCurrentTeam = isRunning && activeTimer?.teamId === currentTeamId
+
   return {
     activeTimer,
     elapsedMs,
-    isRunning: !!activeTimer,
+    isRunning,
+    isRunningForCurrentTeam,
     startTimer: handleStartTimer,
     stopTimer: handleStopTimer,
   }
