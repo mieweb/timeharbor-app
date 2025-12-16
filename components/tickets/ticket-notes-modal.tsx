@@ -40,6 +40,7 @@ export function TicketNotesModal() {
     if (newNote.trim() && showTicketNotesModal.ticketId) {
       addNoteToTicket(showTicketNotesModal.ticketId, newNote.trim())
       setNewNote("")
+      hideTicketNotes()
     }
   }
 
