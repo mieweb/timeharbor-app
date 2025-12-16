@@ -72,11 +72,16 @@ interface SyncSlice {
   syncQueue: SyncQueueItem[]
   lastSyncedAt: string | null
   persistenceLoaded: boolean
+  pendingChangesCount: number
   setSyncStatus: (status: SyncStatus) => void
   addToSyncQueue: (item: Omit<SyncQueueItem, "id" | "createdAt" | "retryCount">) => void
   removeFromSyncQueue: (id: string) => void
   setLastSyncedAt: (timestamp: string) => void
   setPersistenceLoaded: (loaded: boolean) => void
+  incrementPendingChanges: () => void
+  decrementPendingChanges: () => void
+  setPendingChangesCount: (count: number) => void
+  getPendingChangesCount: () => number
 }
 
 // UI slice
@@ -254,14 +259,28 @@ export const useAppStore = create<AppStore>()(
         }
 
         const newTicketsByTeam = { ...state.ticketsByTeam }
+        let updatedTicket: Ticket | null = null
         for (const teamId in newTicketsByTeam) {
-          newTicketsByTeam[teamId] = newTicketsByTeam[teamId].map((t) =>
-            t.id === ticketId ? { ...t, notes: [...(t.notes || []), newNote] } : t,
-          )
+          newTicketsByTeam[teamId] = newTicketsByTeam[teamId].map((t) => {
+            if (t.id === ticketId) {
+              updatedTicket = { ...t, notes: [...(t.notes || []), newNote] }
+              return updatedTicket
+            }
+            return t
+          })
         }
+
+        // Queue the ticket update for sync
+        if (updatedTicket) {
+          import("@/lib/db/sync-manager").then(({ queueForSync }) => {
+            queueForSync("update", "ticket", updatedTicket)
+          })
+        }
+
         return {
           ticketsByTeam: newTicketsByTeam,
           activityLog: [activityEntry, ...state.activityLog],
+          pendingChangesCount: state.pendingChangesCount + 1,
         }
       }),
 
@@ -440,7 +459,24 @@ export const useAppStore = create<AppStore>()(
     syncQueue: [],
     lastSyncedAt: null,
     persistenceLoaded: false,
+    pendingChangesCount: 0,
     setSyncStatus: (status) => set({ syncStatus: status }),
+    incrementPendingChanges: () => set((state) => ({ pendingChangesCount: state.pendingChangesCount + 1 })),
+    decrementPendingChanges: () => set((state) => ({ pendingChangesCount: Math.max(0, state.pendingChangesCount - 1) })),
+    setPendingChangesCount: (count) => set({ pendingChangesCount: count }),
+    getPendingChangesCount: () => {
+      const { syncQueue, ticketsByTeam } = get()
+      // Count sync queue items + tickets with local notes
+      let localNotesCount = 0
+      for (const teamId in ticketsByTeam) {
+        for (const ticket of ticketsByTeam[teamId]) {
+          if (ticket.notes && ticket.notes.length > 0) {
+            localNotesCount += ticket.notes.length
+          }
+        }
+      }
+      return syncQueue.length + localNotesCount
+    },
     addToSyncQueue: (item) =>
       set((state) => ({
         syncQueue: [

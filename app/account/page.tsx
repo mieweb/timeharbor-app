@@ -1,15 +1,22 @@
 "use client"
 
-import { LogOut, Trash2 } from "lucide-react"
+import { LogOut, Trash2, Cloud, CloudOff, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useAppStore } from "@/lib/store"
+import { triggerSync } from "@/lib/db/sync-manager"
+import { cn } from "@/lib/utils"
 
 export default function AccountPage() {
   const user = useAppStore((state) => state.user)
   const teams = useAppStore((state) => state.teams)
   const memberships = useAppStore((state) => state.memberships)
   const showConfirm = useAppStore((state) => state.showConfirm)
+  const syncStatus = useAppStore((state) => state.syncStatus)
+  const lastSyncedAt = useAppStore((state) => state.lastSyncedAt)
+  const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
+  
+  const pendingCount = getPendingChangesCount()
 
   const initials =
     user?.name
@@ -92,6 +99,105 @@ export default function AccountPage() {
             </div>
           )
         })}
+      </div>
+
+      {/* Sync Status */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Sync Status</h2>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+          {/* Status indicator */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {syncStatus === "offline" && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted">
+                    <CloudOff className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Offline</p>
+                    <p className="text-sm text-muted-foreground">Changes will sync when online</p>
+                  </div>
+                </>
+              )}
+              {syncStatus === "syncing" && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                    <RefreshCw className="h-5 w-5 text-primary animate-spin" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Syncing...</p>
+                    <p className="text-sm text-muted-foreground">Uploading your changes</p>
+                  </div>
+                </>
+              )}
+              {syncStatus === "error" && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+                    <AlertCircle className="h-5 w-5 text-destructive" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Sync Error</p>
+                    <p className="text-sm text-muted-foreground">Some changes couldn&apos;t be uploaded</p>
+                  </div>
+                </>
+              )}
+              {syncStatus === "idle" && pendingCount === 0 && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10">
+                    <CheckCircle2 className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">All Synced</p>
+                    <p className="text-sm text-muted-foreground">
+                      {lastSyncedAt 
+                        ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString()}`
+                        : "All changes are up to date"}
+                    </p>
+                  </div>
+                </>
+              )}
+              {syncStatus === "idle" && pendingCount > 0 && (
+                <>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning/10">
+                    <Cloud className="h-5 w-5 text-warning" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-foreground">Pending Changes</p>
+                    <p className="text-sm text-muted-foreground">
+                      {pendingCount} {pendingCount === 1 ? "item" : "items"} waiting to sync
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Pending changes details */}
+          {pendingCount > 0 && (
+            <div className={cn(
+              "rounded-lg border p-3",
+              syncStatus === "offline" ? "border-muted bg-muted/30" : "border-warning/30 bg-warning/5"
+            )}>
+              <p className="text-sm text-muted-foreground">
+                You have <span className="font-medium text-foreground">{pendingCount} local {pendingCount === 1 ? "change" : "changes"}</span> that 
+                {syncStatus === "offline" 
+                  ? " will be synced when you're back online."
+                  : " will be synced shortly."}
+              </p>
+            </div>
+          )}
+
+          {/* Manual sync button */}
+          <Button
+            variant="outline"
+            className="w-full gap-2"
+            onClick={() => triggerSync()}
+            disabled={syncStatus === "syncing" || syncStatus === "offline"}
+          >
+            <RefreshCw className={cn("h-4 w-4", syncStatus === "syncing" && "animate-spin")} />
+            {syncStatus === "syncing" ? "Syncing..." : "Sync Now"}
+          </Button>
+        </div>
       </div>
 
       {/* Developer Tools */}

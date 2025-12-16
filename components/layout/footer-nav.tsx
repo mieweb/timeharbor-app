@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, Ticket, Users, User, LogIn, LogOut } from "lucide-react"
+import { LayoutDashboard, Ticket, Users, User, LogIn, LogOut, CloudOff } from "lucide-react"
 import { useAppStore } from "@/lib/store"
 import { useTimer, formatDuration } from "@/hooks/use-timer"
 import { cn } from "@/lib/utils"
@@ -19,7 +19,11 @@ export function FooterNav() {
   const clockIn = useAppStore((state) => state.clockIn)
   const clockOut = useAppStore((state) => state.clockOut)
   const showConfirm = useAppStore((state) => state.showConfirm)
+  const syncStatus = useAppStore((state) => state.syncStatus)
+  const getPendingChangesCount = useAppStore((state) => state.getPendingChangesCount)
   const { isRunning, elapsedMs } = useTimer()
+  
+  const pendingCount = getPendingChangesCount()
 
   const handleClockToggle = () => {
     if (isClockedIn) {
@@ -111,11 +115,29 @@ export function FooterNav() {
         <Link
           href="/account"
           className={cn(
-            "nav-item nav-item--account flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors",
+            "nav-item nav-item--account flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors relative",
             pathname === "/account" ? "text-primary" : "text-muted-foreground hover:text-foreground",
           )}
         >
-          <User className="h-5 w-5" />
+          <div className="relative">
+            <User className="h-5 w-5" />
+            {(pendingCount > 0 || syncStatus === "error" || syncStatus === "offline") && (
+              <span className={cn(
+                "absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center",
+                syncStatus === "offline" && "text-muted-foreground",
+                syncStatus === "error" && "text-destructive",
+              )}>
+                {syncStatus === "offline" ? (
+                  <CloudOff className="h-3 w-3" />
+                ) : (
+                  <span className={cn(
+                    "flex h-2.5 w-2.5 rounded-full",
+                    syncStatus === "error" ? "bg-destructive" : "bg-warning animate-pulse"
+                  )} />
+                )}
+              </span>
+            )}
+          </div>
           <span className="nav-item-label">Account</span>
         </Link>
       </div>

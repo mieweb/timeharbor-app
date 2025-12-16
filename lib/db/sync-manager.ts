@@ -73,13 +73,17 @@ export async function triggerSync() {
   }
 
   const queue = await db.syncQueue.getAll()
+  console.log('[Sync] triggerSync called', { queueLength: queue.length })
+  
   if (queue.length === 0) {
     // Even if queue is empty, pull latest data
+    console.log('[Sync] Queue empty, pulling from server...')
     await pullFromServer()
     return
   }
 
   updateSyncStatus("syncing")
+  console.log('[Sync] Processing queue items:', queue.length)
 
   try {
     // Process queue items one by one
@@ -91,10 +95,11 @@ export async function triggerSync() {
     await pullFromServer()
 
     updateSyncStatus("idle")
+    console.log('[Sync] Sync completed successfully')
     useAppStore.getState().setLastSyncedAt(new Date().toISOString())
     await db.metadata.set("lastSyncedAt", new Date().toISOString())
   } catch (error) {
-    console.error("Sync failed:", error)
+    console.error("[Sync] Sync failed:", error)
     updateSyncStatus("error")
   }
 }
@@ -242,14 +247,59 @@ async function pullFromServer() {
 
   if (!currentTeamId || !userId) return
 
+  console.log('[Sync] pullFromServer starting...', { currentTeamId, userId })
+
   const dataService = getDataService()
   const lastSyncedAt = await db.metadata.get("lastSyncedAt")
 
   try {
     // Pull tickets for current team
-    const tickets = await dataService.tickets.list(currentTeamId)
-    await db.tickets.putMany(tickets)
-    store.setTickets(currentTeamId, tickets)
+    const serverTickets = await dataService.tickets.list(currentTeamId)
+    const localTickets = store.ticketsByTeam[currentTeamId] || []
+    
+    console.log('[Sync] Merging tickets:', {
+      serverCount: serverTickets.length,
+      localCount: localTickets.length,
+      localNoteCounts: localTickets.map(t => ({ id: t.id, title: t.title, notes: t.notes?.length || 0 }))
+    })
+    
+    // Merge server tickets with local data (preserve notes and other local-only fields)
+    const mergedTickets = serverTickets.map(serverTicket => {
+      const localTicket = localTickets.find(t => t.id === serverTicket.id)
+      if (localTicket) {
+        // Preserve local notes and other local-only data
+        const merged = {
+          ...serverTicket,
+          notes: localTicket.notes || [],
+          // Preserve local order if it exists
+        }
+        if (localTicket.notes?.length) {
+          console.log('[Sync] Preserving notes for ticket:', { 
+            ticketId: serverTicket.id, 
+            noteCount: localTicket.notes.length 
+          })
+        }
+        return merged
+      }
+      return serverTicket
+    })
+    
+    // Also include any local-only tickets (not yet synced to server)
+    const serverTicketIds = new Set(serverTickets.map(t => t.id))
+    const localOnlyTickets = localTickets.filter(t => !serverTicketIds.has(t.id))
+    if (localOnlyTickets.length > 0) {
+      console.log('[Sync] Preserving local-only tickets:', localOnlyTickets.map(t => t.id))
+    }
+    
+    const finalTickets = [...mergedTickets, ...localOnlyTickets]
+    
+    console.log('[Sync] Final merged tickets:', {
+      count: finalTickets.length,
+      noteCounts: finalTickets.map(t => ({ id: t.id, notes: t.notes?.length || 0 }))
+    })
+    
+    await db.tickets.putMany(finalTickets)
+    store.setTickets(currentTeamId, finalTickets)
 
     // Pull time entries for user
     const timeEntries = await dataService.time.listForUser(userId, lastSyncedAt || undefined)
