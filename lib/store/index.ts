@@ -57,6 +57,7 @@ interface TimerSlice {
   timeEntries: TimeEntry[]
   activityLog: ActivityLogEntry[]
   clockIn: () => void
+  clockInAndStartTimer: (teamId: string, ticketId: string, ticketTitle: string) => string
   clockOut: () => void
   startTimer: (teamId: string, ticketId: string, ticketTitle: string) => string // returns timeEntryId
   stopTimer: (note?: string) => TimeEntry | null
@@ -303,6 +304,60 @@ export const useAppStore = create<AppStore>()(
         activityLog: [entry, ...state.activityLog],
       }))
       get().addToast("Clocked in successfully", "success")
+    },
+    clockInAndStartTimer: (teamId, ticketId, ticketTitle) => {
+      const now = new Date().toISOString()
+      const timeEntryId = `time-${Date.now()}-${Math.random().toString(36).slice(2)}`
+      
+      // Clock in entry
+      const clockInEntry: ActivityLogEntry = {
+        id: `activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        type: "clock-in",
+        timestamp: now,
+      }
+      
+      // Timer start entry
+      const timerStartEntry: ActivityLogEntry = {
+        id: `activity-${Date.now() + 1}-${Math.random().toString(36).slice(2, 8)}`,
+        type: "timer-start",
+        timestamp: now,
+        ticketId,
+        ticketTitle,
+      }
+      
+      const timeEntry: TimeEntry = {
+        id: timeEntryId,
+        userId: get().user?.id || "",
+        teamId,
+        ticketId,
+        start: now,
+        source: "local",
+        pendingSync: true,
+        createdAt: now,
+      }
+      
+      // Set everything in one atomic update
+      set((state) => ({
+        isClockedIn: true,
+        clockedInAt: now,
+        activeTimer: {
+          teamId,
+          ticketId,
+          timeEntryId,
+          startedAt: now,
+          localClockStart: Date.now(),
+        },
+        timeEntries: [...state.timeEntries, timeEntry],
+        activityLog: [timerStartEntry, clockInEntry, ...state.activityLog],
+      }))
+      
+      get().addToast("Clocked in successfully", "success")
+      
+      import("@/lib/db/sync-manager").then(({ queueForSync }) => {
+        queueForSync("create", "timeEntry", timeEntry)
+      })
+      
+      return timeEntryId
     },
     clockOut: () => {
       const { activeTimer, stopTimer, clockedInAt } = get()

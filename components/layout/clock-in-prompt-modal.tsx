@@ -15,17 +15,20 @@ import { useAppStore } from "@/lib/store"
 export function ClockInPromptModal() {
   const showClockInPrompt = useAppStore((state) => state.showClockInPrompt)
   const hideClockInPrompt = useAppStore((state) => state.hideClockInPrompt)
-  const clockIn = useAppStore((state) => state.clockIn)
-  const startTimer = useAppStore((state) => state.startTimer)
+  const clockInAndStartTimer = useAppStore((state) => state.clockInAndStartTimer)
   const ticketsByTeam = useAppStore((state) => state.ticketsByTeam)
 
   const handleClockInAndStart = () => {
-    clockIn()
     if (showClockInPrompt.pendingTeamId && showClockInPrompt.pendingTicketId) {
-      const ticket = ticketsByTeam[showClockInPrompt.pendingTeamId]?.find(
+      const tickets = ticketsByTeam[showClockInPrompt.pendingTeamId]
+      const ticket = tickets?.find(
         (t) => t.id === showClockInPrompt.pendingTicketId,
       )
-      startTimer(showClockInPrompt.pendingTeamId, showClockInPrompt.pendingTicketId, ticket?.title || "Unknown Ticket")
+      clockInAndStartTimer(
+        showClockInPrompt.pendingTeamId,
+        showClockInPrompt.pendingTicketId,
+        ticket?.title || "Unknown Ticket"
+      )
     }
     hideClockInPrompt()
   }
