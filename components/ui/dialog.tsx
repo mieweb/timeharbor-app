@@ -5,6 +5,7 @@ import * as DialogPrimitive from '@radix-ui/react-dialog'
 import { XIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { useVisualViewportHeightVar } from '@/hooks/use-visual-viewport-height'
 
 function Dialog({
   ...props
@@ -129,6 +130,68 @@ function DialogDescription({
   )
 }
 
+/**
+ * iOS-keyboard-safe dialog content wrapper.
+ * Uses visual viewport tracking to properly resize when the software keyboard opens.
+ * 
+ * Layout pattern:
+ * - Portal contains a fixed inset container for centering
+ * - Content uses maxHeight based on visual viewport (--vvh)
+ * - Internal content scrolls when needed
+ * 
+ * This avoids the traditional top-50% + translate approach which breaks on iOS.
+ */
+function KeyboardSafeDialogContent({
+  className,
+  children,
+  showCloseButton = true,
+  ...props
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  showCloseButton?: boolean
+}) {
+  useVisualViewportHeightVar()
+
+  return (
+    <DialogPortal data-slot="dialog-portal">
+      <DialogOverlay />
+      {/* Fixed container for centering - full screen, centers content */}
+      <div 
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden p-4 pt-[max(1rem,env(safe-area-inset-top))]"
+        style={{ 
+          height: 'var(--vvh, 100dvh)',
+          // Anchor to top of screen so it follows visual viewport
+          top: 0,
+        }}
+      >
+        <DialogPrimitive.Content
+          data-slot="dialog-content"
+          className={cn(
+            'bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 relative z-50 flex flex-col w-full max-w-[calc(100%-2rem)] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg',
+            className,
+          )}
+          style={{
+            maxHeight: 'calc(var(--vvh, 100dvh) - 2rem)',
+            overflow: 'auto',
+            ...(props.style ?? {}),
+          }}
+          {...props}
+        >
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close
+              data-slot="dialog-close"
+              className="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
+            >
+              <XIcon />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Content>
+      </div>
+    </DialogPortal>
+  )
+}
+
 export {
   Dialog,
   DialogClose,
@@ -140,4 +203,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  KeyboardSafeDialogContent,
 }
