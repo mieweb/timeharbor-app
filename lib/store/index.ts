@@ -71,10 +71,12 @@ interface SyncSlice {
   syncStatus: SyncStatus
   syncQueue: SyncQueueItem[]
   lastSyncedAt: string | null
+  persistenceLoaded: boolean
   setSyncStatus: (status: SyncStatus) => void
   addToSyncQueue: (item: Omit<SyncQueueItem, "id" | "createdAt" | "retryCount">) => void
   removeFromSyncQueue: (id: string) => void
   setLastSyncedAt: (timestamp: string) => void
+  setPersistenceLoaded: (loaded: boolean) => void
 }
 
 // UI slice
@@ -437,6 +439,7 @@ export const useAppStore = create<AppStore>()(
     syncStatus: "idle",
     syncQueue: [],
     lastSyncedAt: null,
+    persistenceLoaded: false,
     setSyncStatus: (status) => set({ syncStatus: status }),
     addToSyncQueue: (item) =>
       set((state) => ({
@@ -455,6 +458,7 @@ export const useAppStore = create<AppStore>()(
         syncQueue: state.syncQueue.filter((item) => item.id !== id),
       })),
     setLastSyncedAt: (timestamp) => set({ lastSyncedAt: timestamp }),
+    setPersistenceLoaded: (loaded) => set({ persistenceLoaded: loaded }),
 
     // UI slice
     showTeamSwitcher: false,

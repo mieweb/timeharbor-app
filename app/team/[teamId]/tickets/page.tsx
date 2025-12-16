@@ -16,6 +16,7 @@ export default function TicketsPage() {
   const setShowAddTicketModal = useAppStore((state) => state.setShowAddTicketModal)
   const setTickets = useAppStore((state) => state.setTickets)
   const ticketsByTeam = useAppStore((state) => state.ticketsByTeam)
+  const persistenceLoaded = useAppStore((state) => state.persistenceLoaded)
   const loadedRef = useRef(false)
 
   const [filter, setFilter] = useState<"all" | "open" | "in-progress" | "completed">("all")
@@ -27,28 +28,27 @@ export default function TicketsPage() {
     }
   }, [teamId, currentTeamId, setCurrentTeam])
 
-  // Load tickets
+  // Load tickets - wait for persistence to load first
   useEffect(() => {
-    if (!teamId || loadedRef.current) return
+    if (!teamId || !persistenceLoaded || loadedRef.current) return
 
     async function loadData() {
-      const dataService = getDataService()
-      const freshTickets = await dataService.tickets.list(teamId)
-
-      const cachedTickets = ticketsByTeam[teamId] || []
-      const cachedNotesMap = new Map(cachedTickets.map((t) => [t.id, t.notes || []]))
-
-      const mergedTickets = freshTickets.map((ticket) => ({
-        ...ticket,
-        notes: cachedNotesMap.get(ticket.id) || ticket.notes || [],
-      }))
-
-      setTickets(teamId, mergedTickets)
+      // Check if we already have tickets in the store (from IndexedDB cache)
+      const existingTickets = ticketsByTeam[teamId] || []
+      
+      // Only fetch fresh tickets if we don't have any cached ones
+      if (existingTickets.length === 0) {
+        const dataService = getDataService()
+        const freshTickets = await dataService.tickets.list(teamId)
+        setTickets(teamId, freshTickets)
+      }
+      // If we have cached tickets, don't overwrite them - they may have notes
+      
       loadedRef.current = true
     }
 
     loadData()
-  }, [teamId, setTickets, ticketsByTeam])
+  }, [teamId, persistenceLoaded, setTickets, ticketsByTeam])
 
   return (
     <div className="page-tickets space-y-6">

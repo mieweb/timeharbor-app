@@ -1,6 +1,6 @@
 "use client"
 
-import { LogOut } from "lucide-react"
+import { LogOut, Trash2 } from "lucide-react"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { useAppStore } from "@/lib/store"
@@ -9,6 +9,7 @@ export default function AccountPage() {
   const user = useAppStore((state) => state.user)
   const teams = useAppStore((state) => state.teams)
   const memberships = useAppStore((state) => state.memberships)
+  const showConfirm = useAppStore((state) => state.showConfirm)
 
   const initials =
     user?.name
@@ -19,6 +20,34 @@ export default function AccountPage() {
 
   const getRoleForTeam = (teamId: string) => {
     return memberships.find((m) => m.teamId === teamId)?.role
+  }
+
+  const handleClearLocalState = () => {
+    showConfirm(
+      "Clear All Local Data?",
+      "This will delete all cached tickets, notes, time entries, and activity logs from your browser. This action cannot be undone. The page will reload after clearing.",
+      async () => {
+        try {
+          // Clear IndexedDB
+          const dbName = "time-harbor-db"
+          await new Promise<void>((resolve, reject) => {
+            const request = indexedDB.deleteDatabase(dbName)
+            request.onsuccess = () => resolve()
+            request.onerror = () => reject(request.error)
+            request.onblocked = () => {
+              console.warn("Database deletion blocked")
+              resolve()
+            }
+          })
+
+          // Reload the page to reset all state
+          window.location.reload()
+        } catch (error) {
+          console.error("Failed to clear local state:", error)
+          alert("Failed to clear local data. Please try again.")
+        }
+      },
+    )
   }
 
   return (
@@ -63,6 +92,24 @@ export default function AccountPage() {
             </div>
           )
         })}
+      </div>
+
+      {/* Developer Tools */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Developer Tools</h2>
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-sm text-muted-foreground mb-3">
+            Clear all locally cached data including tickets, notes, time entries, and activity logs.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full gap-2"
+            onClick={handleClearLocalState}
+          >
+            <Trash2 className="h-4 w-4" />
+            Clear All Local Data
+          </Button>
+        </div>
       </div>
 
       {/* Sign Out */}

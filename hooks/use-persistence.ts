@@ -54,6 +54,9 @@ export function usePersistence() {
           setLastSyncedAt(lastSynced)
         }
 
+        // Mark persistence as loaded
+        useAppStore.getState().setPersistenceLoaded(true)
+
         // Initialize sync manager
         const cleanup = initSyncManager()
 
