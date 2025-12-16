@@ -428,7 +428,7 @@ export const useAppStore = create<AppStore>()(
       return timeEntryId
     },
     stopTimer: (note?: string) => {
-      const { activeTimer, timeEntries, ticketsByTeam } = get()
+      const { activeTimer, timeEntries, ticketsByTeam, user } = get()
       if (!activeTimer) {
         return null
       }
@@ -450,6 +450,28 @@ export const useAppStore = create<AppStore>()(
         note,
       }
 
+      // If there's a note, also add it to the ticket's notes array
+      let newTicketsByTeam = ticketsByTeam
+      let updatedTicket: Ticket | null = null
+      if (note && note.trim()) {
+        const newNote = {
+          id: `note-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          content: note.trim(),
+          createdAt: now,
+          createdBy: user?.id || "",
+        }
+        newTicketsByTeam = { ...ticketsByTeam }
+        for (const teamId in newTicketsByTeam) {
+          newTicketsByTeam[teamId] = newTicketsByTeam[teamId].map((t) => {
+            if (t.id === activeTimer.ticketId) {
+              updatedTicket = { ...t, notes: [...(t.notes || []), newNote] }
+              return updatedTicket
+            }
+            return t
+          })
+        }
+      }
+
       if (updatedEntry) {
         const finalEntry: TimeEntry = {
           ...updatedEntry,
@@ -462,10 +484,15 @@ export const useAppStore = create<AppStore>()(
           activeTimer: null,
           timeEntries: state.timeEntries.map((e) => (e.id === activeTimer.timeEntryId ? finalEntry : e)),
           activityLog: [activityEntry, ...state.activityLog],
+          ticketsByTeam: newTicketsByTeam,
         }))
 
         import("@/lib/db/sync-manager").then(({ queueForSync }) => {
           queueForSync("update", "timeEntry", finalEntry)
+          // Also sync the ticket if notes were added
+          if (updatedTicket) {
+            queueForSync("update", "ticket", updatedTicket)
+          }
         })
 
         return finalEntry
@@ -474,6 +501,7 @@ export const useAppStore = create<AppStore>()(
       set((state) => ({
         activeTimer: null,
         activityLog: [activityEntry, ...state.activityLog],
+        ticketsByTeam: newTicketsByTeam,
       }))
       return null
     },
