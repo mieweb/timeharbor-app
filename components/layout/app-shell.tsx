@@ -25,43 +25,28 @@ const tools: OzwellTool[] = [
     type: "function",
     function: {
       name: "get_current_user",
-      description: "Get the current logged-in user information including name, email, and ID",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Get current user's profile (name, email, ID). Use for identity questions.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
     type: "function",
     function: {
       name: "get_active_timer",
-      description: "Get information about any currently running timer, including the ticket being worked on and elapsed time",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Check if a timer is running and get elapsed time. Use for 'what am I working on' questions.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
     type: "function",
     function: {
-      name: "get_recent_tickets",
-      description: "Get a list of recent tickets for the current team",
+      name: "get_tickets",
+      description: "List tickets/tasks. Use for any ticket-related query. Default: returns all tickets.",
       parameters: {
         type: "object",
         properties: {
-          limit: {
-            type: "number",
-            description: "Maximum number of tickets to return (default: 5)",
-          },
-          status: {
-            type: "string",
-            description: "Filter by status: open, in-progress, completed, or all (default: all)",
-            enum: ["open", "in-progress", "completed", "all"],
-          },
+          limit: { type: "number", description: "Max tickets to return (default: 10)" },
+          status: { type: "string", enum: ["open", "in-progress", "completed", "all"], description: "Filter by status (default: all)" },
         },
         required: [],
       },
@@ -71,35 +56,21 @@ const tools: OzwellTool[] = [
     type: "function",
     function: {
       name: "get_clock_status",
-      description: "Get the current clock-in/clock-out status and today's total work time",
-      parameters: {
-        type: "object",
-        properties: {},
-        required: [],
-      },
+      description: "Get clock-in status and today's total work hours.",
+      parameters: { type: "object", properties: {}, required: [] },
     },
   },
   {
     type: "function",
     function: {
       name: "create_ticket",
-      description: "Create a new ticket in the current team. Use this when the user wants to add a new task or ticket.",
+      description: "Create a new ticket in the current team.",
       parameters: {
         type: "object",
         properties: {
-          title: {
-            type: "string",
-            description: "The title of the ticket (required)",
-          },
-          description: {
-            type: "string",
-            description: "Optional description of the ticket",
-          },
-          status: {
-            type: "string",
-            description: "Initial status of the ticket (default: open)",
-            enum: ["open", "in-progress", "completed"],
-          },
+          title: { type: "string", description: "Ticket title (required)" },
+          description: { type: "string", description: "Ticket description" },
+          status: { type: "string", enum: ["open", "in-progress", "completed"], description: "Initial status (default: open)" },
         },
         required: ["title"],
       },
@@ -109,31 +80,15 @@ const tools: OzwellTool[] = [
     type: "function",
     function: {
       name: "update_ticket",
-      description: "Update an existing ticket. Use this to edit title, description, status, or add a note to a ticket. Requires the ticket_id.",
+      description: "Update a ticket's title, description, status, or add a note. Get ticket_id from get_tickets first.",
       parameters: {
         type: "object",
         properties: {
-          ticket_id: {
-            type: "string",
-            description: "The ID of the ticket to update (required)",
-          },
-          title: {
-            type: "string",
-            description: "New title for the ticket",
-          },
-          description: {
-            type: "string",
-            description: "New description for the ticket",
-          },
-          status: {
-            type: "string",
-            description: "New status for the ticket",
-            enum: ["open", "in-progress", "completed"],
-          },
-          note: {
-            type: "string",
-            description: "A note to add to the ticket's notes list",
-          },
+          ticket_id: { type: "string", description: "Ticket ID (required)" },
+          title: { type: "string", description: "New title" },
+          description: { type: "string", description: "New description" },
+          status: { type: "string", enum: ["open", "in-progress", "completed"], description: "New status" },
+          note: { type: "string", description: "Note to add" },
         },
         required: ["ticket_id"],
       },
@@ -220,8 +175,8 @@ export function AppShell({ children }: AppShellProps) {
         }
         break
 
-      case "get_recent_tickets": {
-        const limit = (args.limit as number) || 5
+      case "get_tickets": {
+        const limit = (args.limit as number) || 10
         const statusFilter = (args.status as string) || "all"
 
         if (!currentTeamId) {
@@ -415,7 +370,7 @@ export function AppShell({ children }: AppShellProps) {
         widgetUrl="https://ozwell-dev-refserver.opensource.mieweb.org/embed/ozwell.html"
         tools={tools}
         debug={true}
-        system="You are a helpful assistant for TimeHarbor, a time tracking application. You can help users check their current timer status, view their tickets, get user info, and check their clock-in status. You can also create new tickets and update existing tickets (edit title, description, status, or add notes). Use the available tools to fetch and modify data. When updating a ticket, you must have the ticket_id - use get_recent_tickets first if you need to find it."
+        system="You are a helpful assistant for TimeHarbor, a time tracking app. Always use the tools to fetch data - never guess. For ticket questions, use get_tickets. For timer/current work questions, use get_active_timer. For clock-in/hours questions, use get_clock_status. For profile questions, use get_current_user. You can create and update tickets too."
         onReady={() => console.log("Ozwell chat ready!")}
         onToolCall={handleToolCall}
       />
