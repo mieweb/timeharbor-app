@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { Check, Users, Clock } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Modal, ModalHeader, ModalTitle, ModalBody } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
@@ -37,17 +37,17 @@ export function TeamSwitcherModal() {
   }
 
   return (
-    <Dialog open={showTeamSwitcher} onOpenChange={setShowTeamSwitcher}>
-      <DialogContent className="modal-team-switcher sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="modal-team-switcher-header flex items-center gap-2">
-            <Users className="h-5 w-5 text-primary" />
-            Select Team
-          </DialogTitle>
-          <DialogDescription>
-            Choose which team you want to work with. You can only be active in one team at a time.
-          </DialogDescription>
-        </DialogHeader>
+    <Modal open={showTeamSwitcher} onOpenChange={setShowTeamSwitcher} size="sm">
+      <ModalHeader>
+        <ModalTitle className="modal-team-switcher-header flex items-center gap-2">
+          <Users className="h-5 w-5 text-primary" />
+          Select Team
+        </ModalTitle>
+      </ModalHeader>
+      <ModalBody>
+        <p className="text-muted-foreground text-sm">
+          Choose which team you want to work with. You can only be active in one team at a time.
+        </p>
 
         {/* Clocked-in warning */}
         {isClockedIn && clockedInTeamId && (
@@ -107,7 +107,7 @@ export function TeamSwitcherModal() {
             )
           })}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ModalBody>
+    </Modal>
   )
 }

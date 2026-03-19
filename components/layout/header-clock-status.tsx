@@ -1,7 +1,7 @@
 "use client"
 
 import { Square, Clock, ChevronDown, Users, Cloud, CloudOff, Loader2, AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 import { useTimer, formatDuration } from "@/hooks/use-timer"
 import { useClockedInTimer } from "@/hooks/use-clocked-in-timer"
@@ -129,7 +129,7 @@ export function HeaderClockStatus() {
               </div>
               <Button
                 size="sm"
-                variant="destructive"
+                variant="danger"
                 className="btn-stop-timer h-8 w-8 p-0"
                 onClick={handleStopTimer}
                 aria-label="Stop timer"

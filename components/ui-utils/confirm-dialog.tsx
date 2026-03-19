@@ -1,15 +1,7 @@
 "use client"
 
 import { AlertTriangle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Button, Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 
 export function ConfirmDialog() {
@@ -22,23 +14,22 @@ export function ConfirmDialog() {
   }
 
   return (
-    <Dialog open={showConfirmDialog.open} onOpenChange={(open) => !open && hideConfirm()}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-warning" />
-            {showConfirmDialog.title}
-          </DialogTitle>
-          <DialogDescription>{showConfirmDialog.message}</DialogDescription>
-        </DialogHeader>
-
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={hideConfirm}>
-            Cancel
-          </Button>
-          <Button onClick={handleConfirm}>Continue</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal open={showConfirmDialog.open} onOpenChange={(open) => !open && hideConfirm()} size="sm">
+      <ModalHeader>
+        <ModalTitle className="flex items-center gap-2">
+          <AlertTriangle className="h-5 w-5 text-warning" />
+          {showConfirmDialog.title}
+        </ModalTitle>
+      </ModalHeader>
+      <ModalBody>
+        <p className="text-muted-foreground text-sm">{showConfirmDialog.message}</p>
+      </ModalBody>
+      <ModalFooter className="mt-4">
+        <Button variant="outline" onClick={hideConfirm}>
+          Cancel
+        </Button>
+        <Button onClick={handleConfirm}>Continue</Button>
+      </ModalFooter>
+    </Modal>
   )
 }

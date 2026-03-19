@@ -4,19 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { Ticket, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button, Input, Textarea, Select, Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 import { getDataService } from "@/lib/services/data-service"
 import { db } from "@/lib/db/indexed-db"
@@ -99,26 +87,27 @@ export function AddTicketModal() {
   }
 
   return (
-    <Dialog open={showAddTicketModal} onOpenChange={setShowAddTicketModal}>
-      <DialogContent className="modal-add-ticket sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="modal-add-ticket-header flex items-center gap-2">
-            <Ticket className="h-5 w-5 text-primary" />
-            Add Ticket
-          </DialogTitle>
-          <DialogDescription>
-            Create a new ticket to track your work.
-            {syncStatus === "offline" && (
-              <span className="modal-add-ticket-offline-warning block mt-1 text-warning">
-                You're offline. Ticket will sync when back online.
-              </span>
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <Modal open={showAddTicketModal} onOpenChange={setShowAddTicketModal} size="sm">
+      <ModalHeader>
+        <ModalTitle className="modal-add-ticket-header flex items-center gap-2">
+          <Ticket className="h-5 w-5 text-primary" />
+          Add Ticket
+        </ModalTitle>
+      </ModalHeader>
+
+      <ModalBody>
+        <p className="text-muted-foreground text-sm">
+          Create a new ticket to track your work.
+          {syncStatus === "offline" && (
+            <span className="modal-add-ticket-offline-warning block mt-1 text-warning">
+              You're offline. Ticket will sync when back online.
+            </span>
+          )}
+        </p>
 
         <form onSubmit={handleSubmit} className="form-add-ticket mt-4 space-y-4">
           <div className="form-field form-field--title space-y-2">
-            <Label htmlFor="title">Title</Label>
+            <label htmlFor="title" className="text-sm font-medium">Title</label>
             <Input
               id="title"
               value={title}
@@ -129,7 +118,7 @@ export function AddTicketModal() {
           </div>
 
           <div className="form-field form-field--description space-y-2">
-            <Label htmlFor="description">Description (optional)</Label>
+            <label htmlFor="description" className="text-sm font-medium">Description (optional)</label>
             <Textarea
               id="description"
               value={description}
@@ -140,20 +129,19 @@ export function AddTicketModal() {
           </div>
 
           <div className="form-field form-field--status space-y-2">
-            <Label htmlFor="status">Status</Label>
-            <Select value={status} onValueChange={(v) => setStatus(v as TicketStatus)}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">Open</SelectItem>
-                <SelectItem value="in-progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-              </SelectContent>
-            </Select>
+            <Select
+              label="Status"
+              value={status}
+              onValueChange={(v) => setStatus(v as TicketStatus)}
+              options={[
+                { value: "open", label: "Open" },
+                { value: "in-progress", label: "In Progress" },
+                { value: "completed", label: "Completed" },
+              ]}
+            />
           </div>
 
-          <DialogFooter className="form-add-ticket-actions mt-6">
+          <ModalFooter className="form-add-ticket-actions mt-6">
             <Button type="button" variant="outline" onClick={handleClose}>
               Cancel
             </Button>
@@ -161,9 +149,9 @@ export function AddTicketModal() {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Ticket
             </Button>
-          </DialogFooter>
+          </ModalFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </ModalBody>
+    </Modal>
   )
 }

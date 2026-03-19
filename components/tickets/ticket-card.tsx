@@ -3,14 +3,7 @@
 import type React from "react"
 
 import { Play, Square, MoreVertical, ChevronUp, ChevronDown, GripVertical, MessageSquare } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Button, Dropdown, DropdownItem, DropdownSeparator } from "@mieweb/ui"
 import type { Ticket } from "@/lib/types"
 import { useTimer, formatDuration, formatDurationHuman } from "@/hooks/use-timer"
 import { useAppStore } from "@/lib/store"
@@ -150,7 +143,7 @@ export function TicketCard({ ticket, todayMs = 0, reorderable = false, index = 0
 
             <Button
               size="sm"
-              variant={isActiveTicket ? "destructive" : "default"}
+              variant={isActiveTicket ? "danger" : "primary"}
               className={cn(
                 "ticket-card-timer-button h-8 gap-1.5 text-xs",
                 !isActiveTicket && "bg-primary hover:bg-primary/90",
@@ -172,30 +165,29 @@ export function TicketCard({ ticket, todayMs = 0, reorderable = false, index = 0
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        <Dropdown
+          trigger={
             <Button variant="ghost" size="sm" className="ticket-card-menu-trigger h-8 w-8 p-0 shrink-0">
               <MoreVertical className="h-4 w-4" />
               <span className="sr-only">More options</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => showTicketNotes(ticket.id)}>
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Notes {notesCount > 0 && `(${notesCount})`}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => updateTicket(ticket.id, { status: "open" })}>
-              Mark as Open
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateTicket(ticket.id, { status: "in-progress" })}>
-              Mark as In Progress
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateTicket(ticket.id, { status: "completed" })}>
-              Mark as Completed
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          }
+          placement="bottom-end"
+        >
+          <DropdownItem onClick={() => showTicketNotes(ticket.id)} icon={<MessageSquare className="h-4 w-4" />}>
+            Notes {notesCount > 0 && `(${notesCount})`}
+          </DropdownItem>
+          <DropdownSeparator />
+          <DropdownItem onClick={() => updateTicket(ticket.id, { status: "open" })}>
+            Mark as Open
+          </DropdownItem>
+          <DropdownItem onClick={() => updateTicket(ticket.id, { status: "in-progress" })}>
+            Mark as In Progress
+          </DropdownItem>
+          <DropdownItem onClick={() => updateTicket(ticket.id, { status: "completed" })}>
+            Mark as Completed
+          </DropdownItem>
+        </Dropdown>
       </div>
     </div>
   )

@@ -1,12 +1,13 @@
 "use client"
 
-import { LogOut, Trash2, Cloud, CloudOff, RefreshCw, AlertCircle, CheckCircle2, Clock, Play, Square, StickyNote, LogIn } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Button } from "@/components/ui/button"
+import { LogOut, Trash2, Cloud, CloudOff, RefreshCw, AlertCircle, CheckCircle2, Clock, Play, Square, StickyNote, LogIn, Palette, Sun, Moon, Monitor } from "lucide-react"
+import { Avatar, Button, Select } from "@mieweb/ui"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useAppStore } from "@/lib/store"
 import { triggerSync } from "@/lib/db/sync-manager"
 import { cn } from "@/lib/utils"
+import { useBrand } from "@/hooks/use-brand"
+import { useTheme } from "next-themes"
 import type { ActivityLogEntry } from "@/lib/types"
 
 export default function AccountPage() {
@@ -17,6 +18,8 @@ export default function AccountPage() {
   const syncStatus = useAppStore((state) => state.syncStatus)
   const lastSyncedAt = useAppStore((state) => state.lastSyncedAt)
   const activityLog = useAppStore((state) => state.activityLog)
+  const { brand, setBrand, brands } = useBrand()
+  const { theme, setTheme } = useTheme()
   
   // Show all pending across all teams in account page
   const pendingEntries = activityLog.filter(e => e.pendingSync)
@@ -96,13 +99,55 @@ export default function AccountPage() {
       {/* Profile */}
       <div className="rounded-xl border border-border bg-card p-6">
         <div className="flex items-center gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={user?.avatarUrl || "/placeholder.svg"} alt={user?.name} />
-            <AvatarFallback className="bg-primary/10 text-primary text-lg">{initials}</AvatarFallback>
-          </Avatar>
+          <Avatar className="h-16 w-16" src={user?.avatarUrl || undefined} name={user?.name} />
           <div>
             <h2 className="text-lg font-semibold text-foreground">{user?.name}</h2>
             <p className="text-muted-foreground">{user?.email}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Appearance */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Appearance</h2>
+        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <Palette className="h-5 w-5 text-primary" />
+            </div>
+            <div className="flex-1">
+              <Select
+                label="Brand"
+                hideLabel
+                value={brand}
+                onValueChange={(v) => setBrand(v as typeof brand)}
+                options={brands.map((b) => ({ value: b.value, label: b.label }))}
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              {theme === "dark" ? (
+                <Moon className="h-5 w-5 text-primary" />
+              ) : theme === "light" ? (
+                <Sun className="h-5 w-5 text-primary" />
+              ) : (
+                <Monitor className="h-5 w-5 text-primary" />
+              )}
+            </div>
+            <div className="flex-1">
+              <Select
+                label="Theme"
+                hideLabel
+                value={theme ?? "system"}
+                onValueChange={setTheme}
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark" },
+                  { value: "system", label: "System" },
+                ]}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -298,7 +343,7 @@ export default function AccountPage() {
             Clear all locally cached data including tickets, notes, time entries, and activity logs.
           </p>
           <Button
-            variant="destructive"
+            variant="danger"
             className="w-full gap-2"
             onClick={handleClearLocalState}
           >
