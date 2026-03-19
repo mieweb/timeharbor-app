@@ -1,16 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
+import { Button, Textarea, Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 import { formatDuration } from "@/hooks/use-timer"
 
@@ -62,15 +53,13 @@ export function StopTimerModal() {
   }
 
   return (
-    <Dialog open={showStopTimerPrompt.open} onOpenChange={handleOpenChange}>
-      <DialogContent className="stop-timer-modal sm:max-w-md">
-        <DialogHeader className="stop-timer-modal-header">
-          <DialogTitle className="stop-timer-modal-title">Stop Timer</DialogTitle>
-          <DialogDescription className="stop-timer-modal-description">
-            <span className="block font-medium text-foreground">{showStopTimerPrompt.ticketTitle}</span>
-            <span className="block mt-1 font-mono text-lg">{formatDuration(liveElapsedMs)}</span>
-          </DialogDescription>
-        </DialogHeader>
+    <Modal open={showStopTimerPrompt.open} onOpenChange={handleOpenChange} size="sm">
+      <ModalHeader className="stop-timer-modal-header">
+        <ModalTitle className="stop-timer-modal-title">Stop Timer</ModalTitle>
+      </ModalHeader>
+      <ModalBody className="stop-timer-modal-description">
+        <span className="block font-medium text-foreground">{showStopTimerPrompt.ticketTitle}</span>
+        <span className="block mt-1 font-mono text-lg">{formatDuration(liveElapsedMs)}</span>
         <div className="stop-timer-modal-body py-2">
           <Textarea
             className="stop-timer-note-input min-h-[80px]"
@@ -80,15 +69,15 @@ export function StopTimerModal() {
             autoFocus
           />
         </div>
-        <DialogFooter className="stop-timer-modal-footer gap-2 sm:gap-0">
-          <Button variant="outline" onClick={handleSkip} className="stop-timer-skip-button bg-transparent">
-            Skip
-          </Button>
-          <Button onClick={handleSubmit} className="stop-timer-submit-button">
-            Stop Timer
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      </ModalBody>
+      <ModalFooter className="stop-timer-modal-footer gap-2 sm:gap-0">
+        <Button variant="outline" onClick={handleSkip} className="stop-timer-skip-button bg-transparent">
+          Skip
+        </Button>
+        <Button onClick={handleSubmit} className="stop-timer-submit-button">
+          Stop Timer
+        </Button>
+      </ModalFooter>
+    </Modal>
   )
 }

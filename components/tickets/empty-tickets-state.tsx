@@ -1,7 +1,7 @@
 "use client"
 
 import { Ticket, Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 
 interface EmptyTicketsStateProps {

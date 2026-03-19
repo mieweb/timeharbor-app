@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react"
 import { useParams } from "next/navigation"
 import { Plus } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@mieweb/ui"
 import { TicketList } from "@/components/tickets/ticket-list"
 import { ActivityLog } from "@/components/activity/activity-log"
 import { useAppStore } from "@/lib/store"

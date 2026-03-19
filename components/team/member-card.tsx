@@ -1,7 +1,7 @@
 "use client"
 
 import { Crown } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Avatar } from "@mieweb/ui"
 import type { User, Membership } from "@/lib/types"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -25,10 +25,7 @@ export function MemberCard({ member }: MemberCardProps) {
   return (
     <div className="member-card flex items-center gap-3 rounded-lg border border-border bg-card p-4">
       <div className="member-card-avatar-wrapper relative">
-        <Avatar className="h-10 w-10">
-          <AvatarImage src={member.user.avatarUrl || "/placeholder.svg"} alt={member.user.name} />
-          <AvatarFallback className="bg-primary/10 text-primary text-sm">{initials}</AvatarFallback>
-        </Avatar>
+        <Avatar className="h-10 w-10" src={member.user.avatarUrl || undefined} name={member.user.name} />
         {isOnline && (
           <span className="member-card-online-indicator absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card bg-success" />
         )}

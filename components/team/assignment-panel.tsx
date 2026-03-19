@@ -2,8 +2,7 @@
 
 import { useState } from "react"
 import { UserPlus, X, Loader2 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button, Select } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 import { getDataService } from "@/lib/services/data-service"
 import type { Assignment, User, Membership, Ticket } from "@/lib/types"
@@ -95,18 +94,16 @@ export function AssignmentPanel({ ticket, assignments, members }: AssignmentPane
 
       {availableMembers.length > 0 && (
         <div className="assignment-add-form flex items-center gap-2">
-          <Select value={selectedMember} onValueChange={setSelectedMember}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Select member..." />
-            </SelectTrigger>
-            <SelectContent>
-              {availableMembers.map((member) => (
-                <SelectItem key={member.userId} value={member.userId}>
-                  {member.user.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Select
+              value={selectedMember}
+              onValueChange={setSelectedMember}
+              placeholder="Select member..."
+              options={availableMembers.map((member) => ({
+                value: member.userId,
+                label: member.user.name,
+              }))}
+              className="flex-1"
+            />
           <Button size="sm" onClick={handleAssign} disabled={!selectedMember || isLoading} className="btn-assign">
             {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
           </Button>

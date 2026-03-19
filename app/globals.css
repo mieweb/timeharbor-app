@@ -1,108 +1,85 @@
+@import "@mieweb/ui/brands/bluehive.css" layer(theme);
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
+@source "../node_modules/@mieweb/ui/dist";
 
-/* Time Harbor dark theme with teal accent for productivity */
+@custom-variant dark (&:is(.dark *, [data-theme=dark] *));
+
+/* Sidebar tokens – app-specific, not provided by @mieweb/ui */
 :root {
-  --background: oklch(0.985 0.002 247);
-  --foreground: oklch(0.145 0.005 247);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0.005 247);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0.005 247);
-  --primary: oklch(0.65 0.15 175);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.96 0.005 247);
-  --secondary-foreground: oklch(0.25 0.01 247);
-  --muted: oklch(0.94 0.005 247);
-  --muted-foreground: oklch(0.5 0.01 247);
-  --accent: oklch(0.55 0.12 175);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.88 0.005 247);
-  --input: oklch(0.92 0.005 247);
-  --ring: oklch(0.65 0.15 175);
-  --success: oklch(0.65 0.18 145);
-  --success-foreground: oklch(1 0 0);
-  --warning: oklch(0.75 0.15 75);
-  --warning-foreground: oklch(0.2 0.05 75);
   --radius: 0.5rem;
-  --sidebar: oklch(0.98 0.002 247);
-  --sidebar-foreground: oklch(0.145 0.005 247);
-  --sidebar-primary: oklch(0.65 0.15 175);
-  --sidebar-primary-foreground: oklch(1 0 0);
-  --sidebar-accent: oklch(0.94 0.02 175);
-  --sidebar-accent-foreground: oklch(0.25 0.01 247);
-  --sidebar-border: oklch(0.88 0.005 247);
-  --sidebar-ring: oklch(0.65 0.15 175);
+  --sidebar: var(--mieweb-background, #ffffff);
+  --sidebar-foreground: var(--mieweb-foreground, #171717);
+  --sidebar-primary: var(--mieweb-primary-500, #27aae1);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--mieweb-muted, #f5f5f5);
+  --sidebar-accent-foreground: var(--mieweb-foreground, #171717);
+  --sidebar-border: var(--mieweb-border, #e5e7eb);
+  --sidebar-ring: var(--mieweb-ring, #27aae1);
 }
 
-.dark {
-  --background: oklch(0.12 0.01 247);
-  --foreground: oklch(0.95 0.005 247);
-  --card: oklch(0.16 0.01 247);
-  --card-foreground: oklch(0.95 0.005 247);
-  --popover: oklch(0.16 0.01 247);
-  --popover-foreground: oklch(0.95 0.005 247);
-  --primary: oklch(0.7 0.15 175);
-  --primary-foreground: oklch(0.12 0.01 247);
-  --secondary: oklch(0.22 0.01 247);
-  --secondary-foreground: oklch(0.95 0.005 247);
-  --muted: oklch(0.22 0.01 247);
-  --muted-foreground: oklch(0.65 0.01 247);
-  --accent: oklch(0.6 0.12 175);
-  --accent-foreground: oklch(0.12 0.01 247);
-  --destructive: oklch(0.5 0.18 25);
-  --destructive-foreground: oklch(0.95 0.005 247);
-  --border: oklch(0.26 0.01 247);
-  --input: oklch(0.22 0.01 247);
-  --ring: oklch(0.7 0.15 175);
-  --success: oklch(0.6 0.16 145);
-  --success-foreground: oklch(0.12 0.01 247);
-  --warning: oklch(0.7 0.14 75);
-  --warning-foreground: oklch(0.12 0.01 247);
-  --sidebar: oklch(0.14 0.01 247);
-  --sidebar-foreground: oklch(0.95 0.005 247);
-  --sidebar-primary: oklch(0.7 0.15 175);
-  --sidebar-primary-foreground: oklch(0.12 0.01 247);
-  --sidebar-accent: oklch(0.22 0.02 175);
-  --sidebar-accent-foreground: oklch(0.95 0.005 247);
-  --sidebar-border: oklch(0.26 0.01 247);
-  --sidebar-ring: oklch(0.7 0.15 175);
+.dark,
+[data-theme="dark"] {
+  --sidebar: var(--mieweb-background, #1a1a1a);
+  --sidebar-foreground: var(--mieweb-foreground, #fafafa);
+  --sidebar-primary: var(--mieweb-primary-500, #27aae1);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--mieweb-muted, #262626);
+  --sidebar-accent-foreground: var(--mieweb-foreground, #fafafa);
+  --sidebar-border: var(--mieweb-border, #333333);
+  --sidebar-ring: var(--mieweb-ring, #27aae1);
 }
 
 @theme inline {
   --font-sans: "Geist", "Geist Fallback";
   --font-mono: "Geist Mono", "Geist Mono Fallback";
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
+
+  /* Primary */
+  --color-primary: var(--mieweb-primary-500, #27aae1);
+  --color-primary-foreground: var(--mieweb-primary-foreground, #ffffff);
+
+  /* Semantic surfaces */
+  --color-background: var(--mieweb-background, #ffffff);
+  --color-foreground: var(--mieweb-foreground, #171717);
+  --color-card: var(--mieweb-card, #ffffff);
+  --color-card-foreground: var(--mieweb-card-foreground, #171717);
+  --color-popover: var(--mieweb-card, #ffffff);
+  --color-popover-foreground: var(--mieweb-card-foreground, #171717);
+  --color-muted: var(--mieweb-muted, #f5f5f5);
+  --color-muted-foreground: var(--mieweb-muted-foreground, #737373);
+  --color-secondary: var(--mieweb-muted, #f5f5f5);
+  --color-secondary-foreground: var(--mieweb-foreground, #171717);
+  --color-accent: var(--mieweb-muted, #f5f5f5);
+  --color-accent-foreground: var(--mieweb-foreground, #171717);
+
+  /* Status */
+  --color-destructive: var(--mieweb-destructive, #ef4444);
+  --color-destructive-foreground: var(--mieweb-destructive-foreground, #ffffff);
+  --color-success: var(--mieweb-success, #22c55e);
+  --color-success-foreground: var(--mieweb-success-foreground, #ffffff);
+  --color-warning: var(--mieweb-warning, #f59e0b);
+  --color-warning-foreground: var(--mieweb-warning-foreground, #ffffff);
+
+  /* Borders & focus */
+  --color-border: var(--mieweb-border, #e5e7eb);
+  --color-input: var(--mieweb-input, #e5e7eb);
+  --color-ring: var(--mieweb-ring, #27aae1);
+
+  /* Chart */
+  --color-chart-1: var(--mieweb-chart-1, #27aae1);
+  --color-chart-2: var(--mieweb-chart-2, #2dd4bf);
+  --color-chart-3: var(--mieweb-chart-3, #a78bfa);
+  --color-chart-4: var(--mieweb-chart-4, #fb923c);
+  --color-chart-5: var(--mieweb-chart-5, #f472b6);
+
+  /* Radius */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sidebar */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);

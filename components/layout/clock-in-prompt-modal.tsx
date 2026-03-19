@@ -1,15 +1,7 @@
 "use client"
 
 import { LogIn, Clock } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
+import { Button, Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from "@mieweb/ui"
 import { useAppStore } from "@/lib/store"
 
 export function ClockInPromptModal() {
@@ -38,28 +30,28 @@ export function ClockInPromptModal() {
   }
 
   return (
-    <Dialog open={showClockInPrompt.open} onOpenChange={(open) => !open && hideClockInPrompt()}>
-      <DialogContent className="clock-in-prompt-modal sm:max-w-md">
-        <DialogHeader className="clock-in-prompt-header">
-          <div className="clock-in-prompt-icon mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <Clock className="h-6 w-6 text-primary" />
-          </div>
-          <DialogTitle className="clock-in-prompt-title text-center">Clock In Required</DialogTitle>
-          <DialogDescription className="clock-in-prompt-description text-center">
-            You need to clock in before starting a timer on a ticket. Would you like to clock in now and start the
-            timer?
-          </DialogDescription>
-        </DialogHeader>
-        <DialogFooter className="clock-in-prompt-actions flex-col gap-2 sm:flex-col">
-          <Button onClick={handleClockInAndStart} className="clock-in-prompt-confirm w-full gap-2">
-            <LogIn className="h-4 w-4" />
-            Clock In & Start Timer
-          </Button>
-          <Button variant="outline" onClick={handleCancel} className="clock-in-prompt-cancel w-full bg-transparent">
-            Cancel
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <Modal open={showClockInPrompt.open} onOpenChange={(open) => !open && hideClockInPrompt()} size="sm">
+      <ModalHeader className="clock-in-prompt-header">
+        <div className="clock-in-prompt-icon mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+          <Clock className="h-6 w-6 text-primary" />
+        </div>
+        <ModalTitle className="clock-in-prompt-title text-center">Clock In Required</ModalTitle>
+      </ModalHeader>
+      <ModalBody>
+        <p className="clock-in-prompt-description text-center text-muted-foreground text-sm">
+          You need to clock in before starting a timer on a ticket. Would you like to clock in now and start the
+          timer?
+        </p>
+      </ModalBody>
+      <ModalFooter className="clock-in-prompt-actions flex-col gap-2 sm:flex-col">
+        <Button onClick={handleClockInAndStart} className="clock-in-prompt-confirm w-full gap-2">
+          <LogIn className="h-4 w-4" />
+          Clock In & Start Timer
+        </Button>
+        <Button variant="outline" onClick={handleCancel} className="clock-in-prompt-cancel w-full bg-transparent">
+          Cancel
+        </Button>
+      </ModalFooter>
+    </Modal>
   )
 }
